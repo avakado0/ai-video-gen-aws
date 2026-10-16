@@ -1,0 +1,64 @@
+# Claude Code
+CLAUDE.md
+.claude/
+
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+*.tfvars
+*.tfvars.json
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
+# .terraform.lock.hcl is intentionally NOT ignored: commit it to pin provider versions
+
+# Secrets
+.env
+.env.*
+*.pem
+*.key
+credentials
+.aws/
+
+# Python (FastAPI API, GPU worker)
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+
+# Node (web app)
+node_modules/
+.next/
+.vite/
+
+# Lambda / build artifacts
+*.zip
+
+# Model weights and generated media (live in S3, never in git)
+*.safetensors
+*.ckpt
+*.pt
+*.pth
+*.bin
+*.gguf
+*.mp4
+
+# OS / editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
