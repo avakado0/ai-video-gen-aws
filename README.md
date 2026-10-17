@@ -44,6 +44,8 @@ These are the tradeoffs the design is built around.
 
 Idle cost is a handful of small standing items: model weights in S3, ECR image storage, and a few CloudWatch alarms. There is no NAT gateway, ALB or interface endpoint. GPU cost applies only while jobs are being processed.
 
+Per-user cost is tracked through usage logs: the worker records GPU seconds per job, and the API records bytes per download. A saved CloudWatch Logs Insights query sums them per user, and each user's share is applied to the monthly bill. See section 3H of the spec.
+
 <!-- TODO: add measured numbers once deployed: idle $/month, $/clip, cold-start time. -->
 
 ## Repository layout
