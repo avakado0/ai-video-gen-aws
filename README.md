@@ -69,3 +69,7 @@ terraform/                             Planned, not yet created
 
 - Request a Spot service-quota increase for "All G and VT Spot Instance Requests" in `us-west-2`. New accounts often have 0.
 - Choose the model and confirm it fits the instance-store size cap.
+
+## License
+
+MIT. See [LICENSE](LICENSE). Reuse is allowed, including commercially, as long as the copyright notice is kept.
