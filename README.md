@@ -5,7 +5,7 @@ A cost-optimized, serverless-front / GPU-back architecture for generating AI vid
 > **Status: design complete, infrastructure code not started.**
 > The architecture spec and diagram are done. Terraform, the API and the worker are planned (see [Roadmap](#roadmap)). This README will be updated as each part lands.
 
-![Architecture diagram](System_Diagrams/DRAFT3-AI%20Video%20Gen%20System.drawio.png)
+![Architecture diagram](System_Diagrams/FINAL-AI%20Video%20Gen%20System.drawio.png)
 
 ## What it does
 
@@ -52,7 +52,7 @@ Idle cost is a handful of small standing items: model weights in S3, ECR image s
 docs/
   architecture/DRAFT_architecture.md   Architecture spec (source of truth)
   huggingFace_to_s3_instructions.md    Runbook: copy model weights from Hugging Face to S3
-System_Diagrams/                       draw.io diagrams (DRAFT3 is current)
+System_Diagrams/                       draw.io diagrams (FINAL is current)
 terraform/                             Planned, not yet created
 ```
 
