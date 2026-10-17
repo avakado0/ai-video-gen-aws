@@ -1,6 +1,6 @@
 # TODO (human): update the architecture diagram
 
-Claude can't edit the draw.io PNG. `System_Diagrams/DRAFT2-AI Video Gen System.drawio.png` is out of date versus `docs/architecture/DRAFT_architecture.md`, which is the source of truth.
+Claude can't edit the draw.io PNG. `System_Diagrams/DRAFT2-AI Video Gen System.drawio.png` was out of date versus `docs/architecture/DRAFT_architecture.md`, which is the source of truth.
 
 - [x] Add: Cognito User Pool; CloudFront + S3 web app; API Gateway + Lambda; ECR; ECS cluster/service + capacity provider; CloudWatch alarms; Internet Gateway.
 - [x] Add the **DLQ** and the **failure-marker Lambda** (DLQ → Lambda → writes `.failed` marker to the clips bucket).
