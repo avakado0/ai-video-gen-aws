@@ -130,6 +130,33 @@ SQS depth ─► CloudWatch alarm / metric math ─► ECS Service Auto Scaling 
 * **API Lambda role:** `sqs:SendMessage`; on the clips bucket `s3:GetObject`, `s3:DeleteObject`, and **`s3:ListBucket`**. Without `ListBucket`, a HEAD on a missing key returns 403 instead of 404, and "pending" would look like an error.
 * **Failure-marker Lambda role:** `sqs:ReceiveMessage`/`DeleteMessage` on the DLQ; `s3:PutObject` on `clips/*`.
 
+### H. Per-User Cost Attribution (`terraform/ecs.tf`, `api.tf`, `failure.tf`)
+
+All users share the same instances, queue, Lambdas and buckets, so the AWS bill has no per-user dimension and cost-allocation tags cannot split it. Attribution comes from structured usage logs in CloudWatch Logs instead. No database and no always-on resources are added.
+
+* **What drives cost:**
+  * GPU Spot time (with the instance's public IPv4 and root volume) is most of the bill. Attributable per job.
+  * Clip download egress. Attributable per clip.
+  * Overhead that no job owns: cold boot, weight copy, image pull, idle time before scale-in. Spread across users in proportion to their GPU time (see the formula below).
+  * Lambda, API Gateway, SQS, CloudWatch and S3 request costs are negligible at this scale and are not attributed.
+* **Worker usage log:** one JSON line to stdout (ECS ships it to CloudWatch Logs) per job **attempt**, written in the `finally` block (section 4):
+  `{"event": "job_attempt", "sub", "job_id", "attempt", "instance_type", "gpu_seconds", "outcome"}`
+  * `attempt` is the message's `ApproximateReceiveCount` (request it with `MessageSystemAttributeNames=["ApproximateReceiveCount"]`).
+  * `instance_type` comes from IMDS (`meta-data/instance-type`), because g4dn and g5 are priced differently.
+  * `gpu_seconds` is wall-clock time from receive to delete or release.
+  * `outcome` is one of `ok`, `failed`, `released`. Work lost to a Spot release still counts toward the user whose job it was.
+  * A worker killed without warning writes no line; that time falls into overhead.
+* **API usage log:** on `DELETE /jobs/{job_id}` (download confirmed), the API HEADs the clip before deleting it and logs:
+  `{"event": "download", "sub", "job_id", "bytes"}`
+  This approximates egress. Repeat downloads (e.g., after a 403 re-request) and abandoned downloads are not counted.
+* **Log groups:** declared explicitly in Terraform with `retention_in_days = 90`, so logs do not accumulate forever (Lambda's auto-created groups never expire). Worker group in `ecs.tf`, API Lambda group in `api.tf`, failure-marker Lambda group in `failure.tf`.
+* **Saved query (`aws_cloudwatch_query_definition`, free) in `ecs.tf`:** a Logs Insights query over the worker and API log groups that sums `gpu_seconds` per `sub` and `instance_type`, and `bytes` per `sub`, for a chosen time range (normally one calendar month).
+* **Monthly allocation (manual, from the query plus Cost Explorer):**
+  * For each instance type: user's GPU cost = (user's `gpu_seconds` on that type / everyone's `gpu_seconds` on that type) × that type's EC2 Spot cost for the month (Cost Explorer, grouped by instance type), plus the public IPv4 and EBS costs split the same way.
+  * User's egress cost = user's `bytes` × the data-transfer-out rate (after the free tier).
+  * Fixed standing costs (model weights in S3, ECR storage, alarms) are split equally between users.
+* **Cost of this feature:** a few hundred bytes of logs per job (CloudWatch Logs ingestion is $0.50/GB). Per-user custom metrics (Embedded Metric Format with a `sub` dimension) are not used because each costs about $0.30/month.
+
 ---
 
 ## 4. Application Logic & Worker Lifecycle
@@ -144,6 +171,7 @@ The worker handles one job at a time. Spot withdrawal is a **release, not a fail
 ```python
 # Pseudo-code for the containerized worker (illustrative only)
 import signal
+import time
 import boto3
 
 sqs = boto3.client("sqs")
@@ -158,7 +186,8 @@ signal.signal(signal.SIGTERM, lambda *_: globals().update(stopping=True))
 def poll_queue():
     while not stopping:
         resp = sqs.receive_message(
-            QueueUrl=QUEUE_URL, MaxNumberOfMessages=1, WaitTimeSeconds=20
+            QueueUrl=QUEUE_URL, MaxNumberOfMessages=1, WaitTimeSeconds=20,
+            MessageSystemAttributeNames=["ApproximateReceiveCount"],
         )
         if "Messages" not in resp:
             continue
@@ -167,6 +196,8 @@ def poll_queue():
         handle = msg["ReceiptHandle"]
         job = parse_payload(msg["Body"])  # job_id, sub, prompt
         prefix = f"clips/{job['sub']}/{job['job_id']}"
+        started = time.monotonic()
+        outcome = "released"
 
         try:
             protect_task()  # ECS UpdateTaskProtection: no scale-in mid-job
@@ -180,6 +211,7 @@ def poll_queue():
 
             # 3. Done: the API will find the clip via S3 HEAD. Delete the message.
             sqs.delete_message(QueueUrl=QUEUE_URL, ReceiptHandle=handle)
+            outcome = "ok"
         except Aborted:
             # Spot warning or SIGTERM: release the job immediately for retry
             sqs.change_message_visibility(QueueUrl=QUEUE_URL, ReceiptHandle=handle, VisibilityTimeout=0)
@@ -187,11 +219,20 @@ def poll_queue():
             # Retrying cannot help: mark failed and drop the message
             s3.put_object(Bucket=CLIPS_BUCKET, Key=f"{prefix}.failed", Body=b"")
             sqs.delete_message(QueueUrl=QUEUE_URL, ReceiptHandle=handle)
+            outcome = "failed"
         except Exception:
             # Unknown error: release for a quick retry; the DLQ catches repeats
             sqs.change_message_visibility(QueueUrl=QUEUE_URL, ReceiptHandle=handle, VisibilityTimeout=0)
         finally:
             unprotect_task()
+            # Per-user cost attribution (section 3H): one JSON line per attempt
+            log_usage(
+                sub=job["sub"], job_id=job["job_id"],
+                attempt=int(msg["Attributes"]["ApproximateReceiveCount"]),
+                instance_type=instance_type(),  # IMDS meta-data/instance-type
+                gpu_seconds=round(time.monotonic() - started, 1),
+                outcome=outcome,
+            )
 ```
 
 ---
@@ -208,6 +249,7 @@ Decided:
 * FastAPI runs as one Lambda behind an ASGI adapter (Mangum).
 * Pre-signed GET URL expiry: 6 hours, best-effort (see 3C).
 * Failures: DLQ (5 receives) + DLQ-triggered marker Lambda + worker fast path. Spot withdrawal is a release, not a failure.
+* Per-user cost: structured usage logs (worker GPU seconds, API download bytes) in CloudWatch Logs with 90-day retention, summed per `sub` by a saved Logs Insights query and allocated against the monthly bill (see 3H). No database.
 
 Pre-deploy checklist:
 
