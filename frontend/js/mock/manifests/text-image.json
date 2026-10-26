@@ -1,0 +1,10 @@
+{
+  "model": "mock-image-to-video",
+  "limits": { "prompt_max_chars": 500 },
+  "inputs": [
+    { "name": "image", "label": "Starting image", "required": false, "kind": "image", "mime": ["image/png", "image/jpeg"], "max_bytes": 10485760 }
+  ],
+  "params": [
+    { "name": "seed", "type": "int", "default": 0, "min": 0, "max": 99999 }
+  ]
+}

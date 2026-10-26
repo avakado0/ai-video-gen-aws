@@ -1,0 +1,28 @@
+{
+  "model": "mock-reference-to-video",
+  "limits": {
+    "prompt_max_chars": 500
+  },
+  "inputs": [
+    {
+      "name": "references",
+      "label": "Reference images",
+      "required": true,
+      "max_files": 4,
+      "kind": "image",
+      "mime": [
+        "image/png",
+        "image/jpeg"
+      ],
+      "max_bytes": 10485760
+    }
+  ],
+  "params": [
+    {
+      "name": "negative_prompt",
+      "type": "string",
+      "default": "",
+      "max_chars": 200
+    }
+  ]
+}

@@ -1,0 +1,56 @@
+{
+  "model": "mock-avatar",
+  "prompt": "none",
+  "limits": {
+    "prompt_max_chars": 300
+  },
+  "inputs": [
+    {
+      "name": "face_image",
+      "label": "Face image",
+      "required": true,
+      "kind": "image",
+      "mime": [
+        "image/png",
+        "image/jpeg"
+      ],
+      "max_bytes": 10485760
+    },
+    {
+      "name": "audio",
+      "label": "Speech audio",
+      "required": true,
+      "kind": "audio",
+      "mime": [
+        "audio/mpeg",
+        "audio/wav",
+        "audio/x-wav"
+      ],
+      "max_bytes": 20971520,
+      "max_seconds": 60
+    }
+  ],
+  "params": [
+    {
+      "name": "resolution",
+      "type": "enum",
+      "default": "480p",
+      "values": [
+        "480p",
+        "720p"
+      ]
+    },
+    {
+      "name": "guidance",
+      "type": "float",
+      "default": 3.5,
+      "min": 1,
+      "max": 10
+    },
+    {
+      "name": "enhance_face",
+      "type": "bool",
+      "default": true
+    }
+  ]
+}

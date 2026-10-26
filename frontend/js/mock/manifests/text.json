@@ -1,0 +1,15 @@
+{
+  "model": "mock-text-to-video",
+  "limits": {
+    "prompt_max_chars": 500
+  },
+  "inputs": [],
+  "params": [
+    {
+      "name": "negative_prompt",
+      "type": "string",
+      "default": "",
+      "max_chars": 200
+    }
+  ]
+}

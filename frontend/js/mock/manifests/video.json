@@ -1,0 +1,11 @@
+{
+  "model": "mock-video-to-video",
+  "limits": { "prompt_max_chars": 500 },
+  "inputs": [
+    { "name": "source_video", "label": "Source video", "required": true, "kind": "video",
+      "mime": ["video/mp4", "video/webm"], "max_bytes": 104857600, "max_seconds": 10 }
+  ],
+  "params": [
+    { "name": "strength", "type": "float", "default": 0.6, "min": 0, "max": 1 }
+  ]
+}
