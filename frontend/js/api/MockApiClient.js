@@ -7,7 +7,14 @@ const MANIFESTS = {
   video: 'video.json', 'video-audio': 'video-audio.json', avatar: 'avatar.json',
 };
 
-const uuid = () => crypto.randomUUID();
+// crypto.randomUUID() is missing on insecure origins (e.g. http://0.0.0.0), so build a v4 id by hand.
+const uuid = () => {
+  const b = crypto.getRandomValues(new Uint8Array(16));
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  const h = [...b].map((x) => x.toString(16).padStart(2, '0')).join('');
+  return `${h.slice(0, 8)}-${h.slice(8, 12)}-${h.slice(12, 16)}-${h.slice(16, 20)}-${h.slice(20)}`;
+};
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 /**
