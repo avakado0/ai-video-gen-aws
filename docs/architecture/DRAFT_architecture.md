@@ -19,7 +19,7 @@
 
 ```text
 [Browser: web app on CloudFront + S3] ──(login)──► [Cognito User Pool] ──► JWT
-       │ (HTTPS + JWT)
+       │ (HTTPS + JWT)           └─(pre-signed POST: image/audio inputs)──► [Clips bucket: inputs/]
        ▼
 [API Gateway HTTP API (JWT authorizer)] ──► [Lambda: FastAPI]
        │ SendMessage                          │ HEAD / presign / delete
@@ -60,10 +60,20 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
 * **Web app:** Static site in a private S3 bucket served through CloudFront (origin access control). The login screen uses the User Pool.
 * **API:** API Gateway HTTP API with a Cognito JWT authorizer, in front of a single Lambda that runs the whole FastAPI app through an ASGI adapter (Mangum); API Gateway routes every path to it. A browser cannot write to SQS directly, so the API is the only entry point.
   * The caller's `sub` always comes from the **verified JWT claims**, never from the request body. `job_id` is validated as a UUID before it is used in an S3 key. Otherwise a user could read or delete another user's `clips/{sub}/` prefix.
-  * `POST /jobs`: creates a `job_id`, sends the generation request to SQS (includes the caller's `sub`).
-  * `GET /jobs/{job_id}`: checks `clips/{sub}/{job_id}.mp4` and `clips/{sub}/{job_id}.failed` with HEAD. Returns `ready` plus a fresh pre-signed GET URL (6-hour expiry, see 3C), `failed`, or `pending`.
-  * `DELETE /jobs/{job_id}`: called after the browser confirms the download. Deletes the clip.
-  * CORS is enabled on the HTTP API for the CloudFront origin (and on the clips bucket if downloads use `fetch`).
+  * `GET /config`: returns the capability manifest (see "Capability manifest" below). The front end builds its form from it.
+  * `POST /uploads`: body names one manifest input slot and the file's position in it (`slot`, `index`, plus MIME type and size). The API checks it against that slot's definition and returns a **pre-signed POST** (not PUT, so the policy can carry `content-length-range` and `Content-Type` conditions) for `inputs/{sub}/{job_id}/{slot}/{index}`. The first upload of a job also mints the `job_id`, which the client reuses for later uploads and for `POST /jobs`. The browser uploads straight to S3.
+  * `POST /jobs`: body carries `job_id`, `prompt`, optional `params`, and how many files were uploaded per slot (`{slot: count}`). The API validates everything against the manifest (prompt present when required, every required slot present, no unknown slots, file counts within `max_files`, param values clamped to their ranges), HEADs each input under `inputs/{sub}/{job_id}/` (which also yields its size), writes the `clips/{sub}/{job_id}.pending` marker, then sends the request to SQS (includes the caller's `sub`). It logs the input `bytes` for cost attribution (3H).
+  * `GET /jobs`: lists `clips/{sub}/` and groups the objects by `job_id`. `.mp4` means `ready`, `.failed` means `failed`, a bare `.pending` means `pending`. Each entry carries the creation time and prompt read from the marker. Because there is no database, this listing is how a reload or another device finds its jobs.
+  * `GET /jobs/{job_id}`: checks `clips/{sub}/{job_id}.mp4`, `.failed` and `.pending` with HEAD. Returns `ready` plus a fresh pre-signed GET URL (6-hour expiry, see 3C), `failed` plus the failure reason (read from the marker), or `pending`. If none exist it returns 404.
+  * `DELETE /jobs/{job_id}`: called after the browser confirms the download. Deletes the clip and the `.pending` marker.
+  * CORS is enabled on the HTTP API for the CloudFront origin, and on the clips bucket for browser `POST` uploads to `inputs/` (and for downloads if they use `fetch`).
+* **Capability manifest (`model_manifest.json`, repo root of the deployment):** one deployment serves exactly one model, so one manifest describes it. Terraform reads the file and passes it as an environment variable to the API Lambda and the ECS task, so there is a single source of truth and no extra IAM. Contents:
+  * `prompt`: `required` (default), `optional` or `none`. Avatar and lip-sync models often take no prompt.
+  * `inputs`: a list of named **input slots**. Each slot has `name` (lowercase, digits, `_`; used in the S3 key), `label` (shown in the UI), `kind` (`image`, `audio` or `video`), `required`, `max_files` (default 1; more than 1 makes it a repeatable slot, e.g. reference images), `mime` (allowed types), `max_bytes` (per file), and for `audio`/`video` an optional `max_seconds`. The prompt is not a slot. Examples: text-to-video has no slots; image-to-video has one optional `image` slot; first/last-frame has two image slots; video-to-video has a required `source_video` slot; a reference-images model has one `references` slot with `max_files` 4; lip-sync has `source_video` + `audio`; an avatar model has a required `face_image` + `audio`. New model shapes need no code change.
+  * `limits`: `prompt_max_chars`.
+  * `params`: optional list of generation parameters, each with `name`, `type` (`int`, `float`, `enum`, `bool`, `string`), `default`, and `min`/`max`, allowed `values`, or `max_chars` (strings, e.g. a negative prompt). May be empty.
+  * The front end renders the form generically from the manifest and has no model-specific code. The API enforces the manifest on `POST /uploads` and `POST /jobs`, and the worker re-checks it, so calling the API directly cannot bypass it. Changing models means editing this file and the `models/<name>/` prefix.
+* **Front end source (`frontend/`):** vanilla JS ES modules, no build step and no npm. Cognito PKCE uses WebCrypto. All backend calls go through one `ApiClient` interface with a real implementation (`fetch` + JWT) and a mock implementation (in-memory state, fake login, sample clip). `config.json` selects which one, so the same files run with no backend.
 
 ### C. Storage & Data Management (`terraform/storage.tf`)
 
@@ -72,8 +82,13 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * Key layout: `models/<model-name>/...`. The runbook's `S3_PREFIX` and the `user_data` copy path must both use this prefix.
   * Contents: base model weights, copied once from Hugging Face (see `docs/huggingFace_to_s3_instructions.md`). The pipeline never writes to it.
 * **Generated Clips S3 Bucket (`aws_s3_bucket`):**
-  * Key layout: `clips/{sub}/{job_id}.mp4`, and `clips/{sub}/{job_id}.failed` (empty marker for failed jobs).
-  * Lifecycle (`aws_s3_bucket_lifecycle_configuration`): **expire after 1 day** (the S3 minimum). Cheaper storage classes need 30+ days, so there is no transition rule. S3 runs lifecycle rules asynchronously, so removal can lag by up to a day. This is a backstop: the clip is normally deleted by the API as soon as the user's download is confirmed.
+  * Key layout:
+    * `clips/{sub}/{job_id}.mp4`: the generated clip.
+    * `clips/{sub}/{job_id}.pending`: small JSON marker written by `POST /jobs` (creation time, prompt, params). It is what makes an in-progress job visible to `GET /jobs`.
+    * `clips/{sub}/{job_id}.failed`: JSON marker for failed jobs: `{"code", "field"?, "message"}`. The worker writes `invalid_input` (with the offending `field`) for permanent input errors. The DLQ Lambda writes `{"code": "internal"}`. The message is sanitised, because the UI shows it to the user.
+    * `inputs/{sub}/{job_id}/{slot}/{index}`: the user's uploaded inputs, one object per file (a slot can hold several) (3B).
+  * Lifecycle (`aws_s3_bucket_lifecycle_configuration`): **expire after 1 day** (the S3 minimum) on both the `clips/` and `inputs/` prefixes. Cheaper storage classes need 30+ days, so there is no transition rule. S3 runs lifecycle rules asynchronously, so removal can lag by up to a day. This is a backstop: the clip is normally deleted by the API as soon as the user's download is confirmed, and inputs are deleted by the worker after a successful job (section 4). Orphaned uploads, failed jobs and dead-lettered jobs are cleaned by the rule. A job still queued after a day finds its inputs expired and fails with `invalid_input` ("input expired").
+  * CORS: the bucket allows browser `POST` from the CloudFront origin, for the pre-signed upload.
   * Access: private. Videos are exposed only through **pre-signed URLs generated by the API Lambda at download time**. The worker does not generate URLs: URLs signed with EC2 instance-role credentials die when those temporary credentials rotate (hours), so a long-lived URL is not possible from the worker.
   * URL expiry: `ExpiresIn=21600` (6 hours). This is best-effort: the Lambda role's temporary credentials can expire sooner, and the URL stops working with them. The API mints a fresh URL on every `GET /jobs/{job_id}`, so the client simply re-requests if a download returns 403.
 
@@ -86,7 +101,7 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * Redrive policy: `maxReceiveCount = 5`, then the message moves to the DLQ. Every receive counts, including retries after a Spot release, so five in a row on one healthy job is needed to dead-letter it by mistake.
   * No results queue. The UI learns a clip is ready or failed by polling the API (section 3B).
 * **Dead-letter queue (`aws_sqs_queue`):** Receives jobs that failed 5 times. A CloudWatch alarm watches it so failures are visible.
-* **Failure-marker Lambda:** Triggered by the DLQ (SQS event source mapping, $0 when idle). Reads `sub` and `job_id` from the message body and writes `clips/{sub}/{job_id}.failed`. This covers deaths the worker could not report (out of memory, crash, Spot loss without warning).
+* **Failure-marker Lambda:** Triggered by the DLQ (SQS event source mapping, $0 when idle). Reads `sub` and `job_id` from the message body and writes `clips/{sub}/{job_id}.failed` containing `{"code": "internal"}`. This covers deaths the worker could not report (out of memory, crash, Spot loss without warning).
 
 ### E. Compute & Orchestration (`terraform/ecr.tf`, `ecs.tf`, `compute.tf`)
 
@@ -125,9 +140,9 @@ SQS depth ─► CloudWatch alarm / metric math ─► ECS Service Auto Scaling 
 ### G. IAM (`terraform/iam.tf`)
 
 * **EC2 instance profile:** ECS agent permissions, plus `s3:GetObject` and `s3:ListBucket` on the models bucket (for the `user_data` copy).
-* **ECS task role (worker):** `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` on the queue; `s3:PutObject` on `clips/*` in the clips bucket; `ecs:UpdateTaskProtection`.
+* **ECS task role (worker):** `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` on the queue; `s3:PutObject` on `clips/*` in the clips bucket; `s3:GetObject` and `s3:DeleteObject` on `inputs/*`; `ecs:UpdateTaskProtection`.
 * **ECS task execution role:** pull from ECR, write CloudWatch Logs.
-* **API Lambda role:** `sqs:SendMessage`; on the clips bucket `s3:GetObject`, `s3:DeleteObject`, and **`s3:ListBucket`**. Without `ListBucket`, a HEAD on a missing key returns 403 instead of 404, and "pending" would look like an error.
+* **API Lambda role:** `sqs:SendMessage`; on the clips bucket `s3:GetObject`, `s3:PutObject` (the `.pending` marker and the pre-signed upload POST), `s3:DeleteObject`, and **`s3:ListBucket`**. Without `ListBucket`, a HEAD on a missing key returns 403 instead of 404, and "pending" would look like an error.
 * **Failure-marker Lambda role:** `sqs:ReceiveMessage`/`DeleteMessage` on the DLQ; `s3:PutObject` on `clips/*`.
 
 ### H. Per-User Cost Attribution (`terraform/ecs.tf`, `api.tf`, `failure.tf`)
@@ -137,6 +152,7 @@ All users share the same instances, queue, Lambdas and buckets, so the AWS bill 
 * **What drives cost:**
   * GPU Spot time (with the instance's public IPv4 and root volume) is most of the bill. Attributable per job.
   * Clip download egress. Attributable per clip.
+  * Input upload storage and transfer (image, audio, video): small at this scale, but the size is logged on `POST /jobs` so it stays attributable.
   * Overhead that no job owns: cold boot, weight copy, image pull, idle time before scale-in. Spread across users in proportion to their GPU time (see the formula below).
   * Lambda, API Gateway, SQS, CloudWatch and S3 request costs are negligible at this scale and are not attributed.
 * **Worker usage log:** one JSON line to stdout (ECS ships it to CloudWatch Logs) per job **attempt**, written in the `finally` block (section 4):
@@ -148,7 +164,7 @@ All users share the same instances, queue, Lambdas and buckets, so the AWS bill 
   * A worker killed without warning writes no line; that time falls into overhead.
 * **API usage log:** on `DELETE /jobs/{job_id}` (download confirmed), the API HEADs the clip before deleting it and logs:
   `{"event": "download", "sub", "job_id", "bytes"}`
-  This approximates egress. Repeat downloads (e.g., after a 403 re-request) and abandoned downloads are not counted.
+  This approximates egress. Repeat downloads (e.g., after a 403 re-request) and abandoned downloads are not counted. `POST /jobs` likewise logs `{"event": "inputs", "sub", "job_id", "bytes"}` from the HEAD results on the uploaded inputs.
 * **Log groups:** declared explicitly in Terraform with `retention_in_days = 90`, so logs do not accumulate forever (Lambda's auto-created groups never expire). Worker group in `ecs.tf`, API Lambda group in `api.tf`, failure-marker Lambda group in `failure.tf`.
 * **Saved query (`aws_cloudwatch_query_definition`, free) in `ecs.tf`:** a Logs Insights query over the worker and API log groups that sums `gpu_seconds` per `sub` and `instance_type`, and `bytes` per `sub`, for a chosen time range (normally one calendar month).
 * **Monthly allocation (manual, from the query plus Cost Explorer):**
@@ -165,7 +181,7 @@ The worker handles one job at a time. Spot withdrawal is a **release, not a fail
 
 * **With the 2-minute warning** (IMDS `spot/instance-action`, or SIGTERM from ECS via Spot draining): the worker stops generating and calls `ChangeMessageVisibility(VisibilityTimeout=0)`. The job is retried immediately on a replacement instance.
 * **Without warning** (hardware failure, instance vanishes): the worker cannot act. The message reappears after the visibility timeout (about 3 minutes, since the heartbeat stops). The job is delayed, not lost.
-* **Permanent job error** (e.g., invalid prompt): the worker writes `clips/{sub}/{job_id}.failed` and deletes the message (fast path).
+* **Permanent job error** (e.g., invalid prompt, corrupt image or video, no face found in an avatar image, expired input): the worker writes `clips/{sub}/{job_id}.failed` with a JSON reason (`{"code": "invalid_input", "field", "message"}`) and deletes the message (fast path).
 * **Unexpected error or hard crash:** the message is released or reappears and is retried. After 5 receives it moves to the DLQ and the failure-marker Lambda writes the `.failed` marker (section 3D).
 
 ```python
@@ -194,8 +210,9 @@ def poll_queue():
 
         msg = resp["Messages"][0]
         handle = msg["ReceiptHandle"]
-        job = parse_payload(msg["Body"])  # job_id, sub, prompt
+        job = parse_payload(msg["Body"])  # job_id, sub, prompt, params, inputs
         prefix = f"clips/{job['sub']}/{job['job_id']}"
+        input_prefix = f"inputs/{job['sub']}/{job['job_id']}/"
         started = time.monotonic()
         outcome = "released"
 
@@ -204,20 +221,28 @@ def poll_queue():
             # 1. Generate video using local GPU model weights. A heartbeat extends
             #    visibility every minute; inference aborts early if `stopping`
             #    or a Spot notice appears.
-            output_path = run_inference(job["prompt"], should_abort=lambda: stopping or spot_notice())
+            #    Inputs (files per manifest slot) are fetched from S3 and re-checked against the
+            #    manifest; a bad or expired input raises PermanentJobError.
+            local_inputs = fetch_inputs(s3, CLIPS_BUCKET, input_prefix)
+            output_path = run_inference(
+                job["prompt"], local_inputs, job["params"],
+                should_abort=lambda: stopping or spot_notice(),
+            )
 
             # 2. Upload clip to S3 under the caller's prefix
             s3.upload_file(output_path, CLIPS_BUCKET, f"{prefix}.mp4")
 
-            # 3. Done: the API will find the clip via S3 HEAD. Delete the message.
+            # 3. Done: the API will find the clip via S3 HEAD. Delete the message,
+            #    then the inputs (kept until now so a retry can re-read them).
             sqs.delete_message(QueueUrl=QUEUE_URL, ReceiptHandle=handle)
+            delete_inputs(s3, CLIPS_BUCKET, input_prefix)
             outcome = "ok"
         except Aborted:
             # Spot warning or SIGTERM: release the job immediately for retry
             sqs.change_message_visibility(QueueUrl=QUEUE_URL, ReceiptHandle=handle, VisibilityTimeout=0)
-        except PermanentJobError:
-            # Retrying cannot help: mark failed and drop the message
-            s3.put_object(Bucket=CLIPS_BUCKET, Key=f"{prefix}.failed", Body=b"")
+        except PermanentJobError as err:
+            # Retrying cannot help: mark failed (with a sanitised reason) and drop the message
+            s3.put_object(Bucket=CLIPS_BUCKET, Key=f"{prefix}.failed", Body=err.to_json())
             sqs.delete_message(QueueUrl=QUEUE_URL, ReceiptHandle=handle)
             outcome = "failed"
         except Exception:
@@ -244,7 +269,10 @@ Decided:
 * Region `us-west-2`; FastAPI backend; public subnets with public IPs and an Internet Gateway (no NAT).
 * Result delivery: the UI polls the API, which checks S3 and returns a fresh pre-signed URL. No results queue.
 * Clip deletion: API deletes after download confirmation; 1-day lifecycle is the backstop.
-* Two S3 buckets (models, clips).
+* Two S3 buckets (models, clips). User inputs go in the clips bucket under `inputs/`.
+* One model per deployment. The front end is driven by a capability manifest (`model_manifest.json`, section 3B), so text-to-video, image-to-video, video-to-video and avatar models share one UI.
+* Job visibility without a database: `.pending` marker written at submit, `GET /jobs` lists the user's prefix.
+* Front end: vanilla JS, no build step; testable with no backend through a mock `ApiClient`.
 * Model weights always live in S3 and are copied to the EC2 instance store at boot. No EBS for weights.
 * FastAPI runs as one Lambda behind an ASGI adapter (Mangum).
 * Pre-signed GET URL expiry: 6 hours, best-effort (see 3C).
@@ -255,6 +283,7 @@ Pre-deploy checklist:
 
 * **Request a Spot service-quota increase** for "All G and VT Spot Instance Requests" in `us-west-2`. New accounts often have a limit of 0. `g4dn.xlarge` needs 4 vCPU each.
 * Choose the model and confirm it fits the 125 GB instance-store cap.
+* Write `model_manifest.json` for the chosen model.
 
 Open:
 
@@ -288,6 +317,8 @@ Do not use a single large `main.tf`. Organize by service domain, under `terrafor
 * `scaling.tf`: CloudWatch alarms and scaling policies.
 * `iam.tf`: roles and policies (section 3G).
 * `variables.tf` & `outputs.tf`: inputs and outputs (bucket names, VPC IDs, etc.).
+
+`model_manifest.json` sits outside `terraform/` and is read by it (`file()` + `jsonencode`) to set the API Lambda and ECS task environment (section 3B). The static app lives in `frontend/` and is uploaded to the web app bucket.
 
 ### 3. Provider Version Locking
 
