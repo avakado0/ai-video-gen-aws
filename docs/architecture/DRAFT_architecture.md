@@ -62,7 +62,7 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * The caller's `sub` always comes from the **verified JWT claims**, never from the request body. `job_id` is validated as a UUID before it is used in an S3 key. Otherwise a user could read or delete another user's `clips/{sub}/` prefix.
   * `GET /config`: returns the capability manifest (see "Capability manifest" below). The front end builds its form from it.
   * `POST /uploads`: body names one manifest input slot and the file's position in it (`slot`, `index`, plus MIME type and size). The API checks it against that slot's definition and returns a **pre-signed POST** (not PUT, so the policy can carry `content-length-range` and `Content-Type` conditions) for `inputs/{sub}/{job_id}/{slot}/{index}`. The first upload of a job also mints the `job_id`, which the client reuses for later uploads and for `POST /jobs`. The browser uploads straight to S3.
-  * `POST /jobs`: body carries `job_id`, `prompt`, optional `params`, and how many files were uploaded per slot (`{slot: count}`). The API validates everything against the manifest (prompt present when required, every required slot present, no unknown slots, file counts within `max_files`, param values clamped to their ranges), HEADs each input under `inputs/{sub}/{job_id}/` (which also yields its size), writes the `clips/{sub}/{job_id}.pending` marker, then sends the request to SQS (includes the caller's `sub`). It logs the input `bytes` for cost attribution (3H).
+  * `POST /jobs`: body carries `job_id`, `prompt`, optional `params`, and how many files were uploaded per slot (`{slot: count}`). The API validates everything against the manifest (prompt present when required, every required slot present, no unknown slots, file counts within `max_files`, param values clamped to their ranges), HEADs each input under `inputs/{sub}/{job_id}/` (which also yields its size), writes the `clips/{sub}/{job_id}.pending` marker, then sends the request to SQS (includes the caller's `sub`). It rejects the request with 429 if the caller already has 5 active jobs (`.pending` markers without a `.mp4` or `.failed`). The cap is soft: concurrent requests can overshoot it by one; no lock or counter. It logs the input `bytes` for cost attribution (3H).
   * `GET /jobs`: lists `clips/{sub}/` and groups the objects by `job_id`. `.mp4` means `ready`, `.failed` means `failed`, a bare `.pending` means `pending`. Each entry carries the creation time and prompt read from the marker. Because there is no database, this listing is how a reload or another device finds its jobs.
   * `GET /jobs/{job_id}`: checks `clips/{sub}/{job_id}.mp4`, `.failed` and `.pending` with HEAD. Returns `ready` plus a fresh pre-signed GET URL (6-hour expiry, see 3C), `failed` plus the failure reason (read from the marker), or `pending`. If none exist it returns 404.
   * `DELETE /jobs/{job_id}`: called after the browser confirms the download. Deletes the clip and the `.pending` marker.
@@ -281,9 +281,14 @@ Decided:
 
 Pre-deploy checklist:
 
+* **Test doubles:** moto for AWS calls in pytest. Spike first: confirm moto supports pre-signed POST and `ChangeMessageVisibility`. If not, use a hand-written fake for only those calls.
+* **Worker CUDA base image:** chosen to match the NVIDIA driver on the deployed ECS GPU AMI, and pinned by digest. Re-check the match whenever the AMI changes.
+* **JWT verification:** the API Gateway JWT authorizer verifies the token. The Lambda takes `sub` from the claims and does not re-verify. The Lambda must have no public function URL, and its resource policy allows only API Gateway. A test asserts that a request with no claims is rejected.
+* **Single environment:** one deployment, no dev or staging stack. Risky changes are planned windows. Add a `dev` stack later if needed.
+* **Terraform state bootstrap:** `terraform/bootstrap/` with local state, applied once by hand. Creates the state bucket (versioning on, public access blocked) and the DynamoDB lock table. The main config uses them as remote state.
 * **Request a Spot service-quota increase** for "All G and VT Spot Instance Requests" in `us-west-2`. New accounts often have a limit of 0. `g4dn.xlarge` needs 4 vCPU each.
-* Choose the model and confirm it fits the 125 GB instance-store cap.
-* Write `model_manifest.json` for the chosen model.
+* Model for v1: Wan 2.1 T2V 1.3B (text-to-video, no input slots), 480p output, on `g4dn.xlarge` (16 GB T4). Confirm it fits the 125 GB instance-store cap and measure T4 generation time in the first spike. Run in fp16; switch to fp32 only if the spike shows black or distorted frames. Image-to-video and avatar shapes follow later as manifest changes; the 14B model would need `g5.xlarge` (24 GB).
+* Write `model_manifest.json` for the chosen model: `prompt` required, no input slots, and three user params: `seed` (int, optional), `duration_seconds` (enum, fixed list: 3 or 5; longer clips wait until the spike measures T4 speed). Resolution is fixed at 480p and not exposed.
 
 Open:
 
