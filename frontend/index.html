@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Video Generator</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <h1>Video Generator <small id="model"></small></h1>
+    <span id="who"></span>
+    <button id="logout" type="button" hidden>Sign out</button>
+  </header>
+
+  <p id="mock-banner" class="banner" hidden>
+    <strong>Mock mode: no backend.</strong> Nothing is sent anywhere; jobs are simulated in this browser tab.
+    <label for="mock-manifest">Pretend the deployed model is:</label>
+    <select id="mock-manifest"></select>
+    <span id="mock-help" class="muted"></span>
+    <span class="muted">Sign in with the button below (fake login). Generation takes about 4 seconds. Use the prompt <code>fail</code> to simulate a failed job.</span>
+  </p>
+
+  <main>
+    <section id="login" hidden>
+      <button id="login-btn" type="button">Sign in</button>
+    </section>
+
+    <section id="app" hidden>
+      <form id="job-form" novalidate>
+        <div id="fields"></div>
+        <button id="submit" type="submit">Generate</button>
+        <span id="submit-status" class="muted"></span>
+      </form>
+      <h2>Your videos</h2>
+      <div id="jobs"></div>
+    </section>
+  </main>
+
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

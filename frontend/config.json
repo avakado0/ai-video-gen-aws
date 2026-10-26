@@ -1,0 +1,10 @@
+{
+  "mock": true,
+  "apiBaseUrl": "",
+  "cognito": {
+    "domain": "",
+    "clientId": "",
+    "redirectUri": ""
+  },
+  "pollSeconds": 3
+}

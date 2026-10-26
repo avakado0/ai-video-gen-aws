@@ -1,0 +1,34 @@
+:root {
+  --bg: #fff; --fg: #1a1a1a; --muted: #666; --line: #d8d8d8; --accent: #2457d6; --err: #b3261e; --ok: #1b7a3d;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --bg: #14161a; --fg: #e8e8e8; --muted: #9aa0a6; --line: #2e3238; --accent: #7aa2ff; --err: #ff8a80; --ok: #6fd08c; }
+}
+* { box-sizing: border-box; }
+body { margin: 0 auto; max-width: 42rem; padding: 1rem; font: 16px/1.5 system-ui, sans-serif; background: var(--bg); color: var(--fg); }
+header { display: flex; align-items: center; gap: .75rem; flex-wrap: wrap; }
+header h1 { font-size: 1.25rem; margin: 0; flex: 1; }
+h1 small { color: var(--muted); font-weight: normal; font-size: .8rem; }
+h2 { font-size: 1.1rem; margin-top: 2rem; }
+.banner { background: var(--line); padding: .5rem .75rem; border-radius: 6px; font-size: .9rem; }
+.banner > * { display: block; margin-top: .35rem; }
+.banner select { color: var(--fg); background: var(--bg); }
+select option { color: var(--fg); background: var(--bg); }
+.field { display: block; margin-bottom: 1rem; }
+.field > span { display: block; font-weight: 600; text-transform: capitalize; }
+.field small { display: block; color: var(--muted); }
+textarea, input[type=number], select, input[type=file] { width: 100%; padding: .5rem; font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; }
+input[type=checkbox] { width: 1.1rem; height: 1.1rem; }
+.advanced { margin-bottom: 1rem; }
+button { font: inherit; padding: .5rem 1rem; border-radius: 6px; border: 1px solid var(--accent); background: var(--accent); color: var(--bg); cursor: pointer; }
+button:disabled { opacity: .5; cursor: default; }
+#logout, .job button { background: transparent; color: var(--accent); }
+.error { color: var(--err); margin: .25rem 0 0; }
+.muted { color: var(--muted); }
+.job { border: 1px solid var(--line); border-radius: 8px; padding: .75rem; margin-bottom: .75rem; }
+.job-prompt { margin: .25rem 0 .5rem; overflow-wrap: anywhere; }
+.job video { width: 100%; border-radius: 6px; }
+.badge { font-size: .75rem; padding: .1rem .5rem; border-radius: 99px; border: 1px solid var(--line); }
+.job.ready .badge { color: var(--ok); }
+.job.failed .badge { color: var(--err); }
+.job a, .job button { margin-right: .75rem; }
