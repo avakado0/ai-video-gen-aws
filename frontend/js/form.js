@@ -26,6 +26,7 @@ export class ManifestForm {
     this.manifest = manifest;
     this.fields = {}; // name -> input element
     this.errors = {}; // name -> error element
+    this.previewBoxes = []; // preview containers; each keeps its object URLs in box.urls
     this.#render();
   }
 
@@ -58,7 +59,12 @@ export class ManifestForm {
       const hint = [slot.required ? 'Required' : 'Optional', slot.kind,
         many && `up to ${slot.max_files} files`, `max ${mb(slot.max_bytes)} each`,
         slot.max_seconds && `max ${slot.max_seconds}s`].filter(Boolean).join(', ');
-      this.root.append(this.#field(slot.name, slot.label, input, hint));
+      const preview = el('div', { className: 'previews' });
+      preview.urls = [];
+      this.previewBoxes.push(preview);
+      input.addEventListener('change', () => this.#showPreviews(slot, input, preview));
+      // The preview sits beside the label, not inside it: clicking player controls in a label would reopen the file picker.
+      this.root.append(el('div', {}, this.#field(slot.name, slot.label, input, hint), preview));
     }
 
     if (params?.length) {
@@ -70,6 +76,23 @@ export class ManifestForm {
       }
       this.root.append(adv);
     }
+  }
+
+  /** Show an image, audio or video preview for each chosen file. */
+  #showPreviews(slot, input, box) {
+    this.#clearPreviews(box);
+    for (const file of input.files) {
+      const url = URL.createObjectURL(file);
+      box.urls.push(url);
+      const media = slot.kind === 'image' ? el('img', { src: url, alt: file.name })
+        : el(slot.kind, { src: url, controls: true, preload: 'metadata' });
+      box.append(el('figure', {}, media, el('figcaption', { textContent: file.name })));
+    }
+  }
+
+  #clearPreviews(box) {
+    box.replaceChildren();
+    box.urls.splice(0).forEach((u) => URL.revokeObjectURL(u));
   }
 
   #paramControl(p) {
@@ -151,6 +174,8 @@ export class ManifestForm {
   }
 
   reset() {
+    this.previewBoxes.forEach((b) => this.#clearPreviews(b));
+    this.previewBoxes = [];
     this.#render();
   }
 }
