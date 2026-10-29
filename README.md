@@ -20,7 +20,7 @@ A small, invite-only group of users logs in to a web app, submits a text prompt,
 | API | API Gateway (HTTP API) + one Lambda running FastAPI via Mangum | JWT authorizer; the only entry point |
 | Queue | SQS standard queue + DLQ | 3-minute visibility timeout with worker heartbeat |
 | Failure reporting | DLQ-triggered Lambda | Writes a `.failed` marker to S3, no database needed |
-| Compute | ECS on EC2 (Spot `g4dn.xlarge` / `g5.xlarge`) in an ASG, min size 0 | Worker is a Docker container from ECR |
+| Compute | ECS on EC2 (Spot `g4dn.2xlarge` / `g5.2xlarge`) in an ASG, min size 0 | Worker is a Docker container from ECR |
 | Storage | Two S3 buckets: model weights, generated clips | Weights copied to instance-store NVMe on each boot |
 | Scaling | CloudWatch alarms -> ECS Service Auto Scaling -> capacity provider -> ASG | Scales from and to zero |
 
@@ -37,7 +37,7 @@ These are the tradeoffs the design is built around.
 - **Spot interruption is a release, not a failure.** On the 2-minute warning the worker aborts and sets the message visibility to 0, so another worker retries immediately. Interruptions never write a failure marker. With no warning, the message reappears after the visibility timeout: delayed, not lost.
 - **Failure reporting without a database.** A permanent error makes the worker write `clips/{sub}/{job_id}.failed` itself. Crashes and repeated failures end up in the DLQ, and a Lambda writes the same marker. `GET /jobs/{id}` reports `ready`, `failed` or `pending` from S3 alone.
 - **Per-user isolation.** The API takes the user's `sub` from verified JWT claims, never from the request body, and validates `job_id` as a UUID, so users can't reach each other's `clips/{sub}/` prefix.
-- **Model weights live in S3 and are copied to instance-store NVMe on boot.** No EBS volumes to pay for or snapshot. The 125 GB `g4dn.xlarge` instance store is the size cap.
+- **Model weights live in S3 and are copied to instance-store NVMe on boot.** No EBS volumes to pay for or snapshot. The 225 GB `g4dn.2xlarge` instance store is the size cap.
 - **Pre-signed URLs are minted by the API Lambda, not the worker.** URLs signed with EC2 role credentials die when those credentials rotate, so the API signs a fresh 6-hour URL on every request.
 
 ## Cost model

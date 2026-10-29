@@ -56,8 +56,8 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
 
 ### B. Authentication, Front End & API (`cognito.tf`, `cloudfront.tf`, `api.tf`)
 
-* **Cognito User Pool (`aws_cognito_user_pool`) + App Client:** User creation restricted to administrators (`admin_create_user_config`), so only the owner, a friend, and whitelisted users (about 5) can sign in. The App Client is a **public client (no client secret)** using authorization code + PKCE, because it runs in a browser. Issues a JWT on login.
-* **Web app:** Static site in a private S3 bucket served through CloudFront (origin access control). The login screen uses the User Pool.
+* **Cognito User Pool (`aws_cognito_user_pool`) + App Client:** User creation restricted to administrators (`admin_create_user_config`), so only the owner, a friend, and whitelisted users (about 5) can sign in. The App Client is a **public client (no client secret)** using authorization code + PKCE, because it runs in a browser. Issues a JWT on login. The login page uses a free Cognito prefix domain (`<prefix>.auth.us-west-2.amazoncognito.com`). Users are created by hand in the Cognito console, not in Terraform, so their emails stay out of the public repo and the Terraform state.
+* **Web app:** Static site in a private S3 bucket served through CloudFront (origin access control), on the default `*.cloudfront.net` address. Terraform uploads the files and writes `config.json` from its outputs (section 5). Short cache TTL (about 5 minutes), so updates show without an invalidation. No custom domain, Route 53 or ACM certificate. The login screen uses the User Pool.
 * **API:** API Gateway HTTP API with a Cognito JWT authorizer, in front of a single Lambda that runs the whole FastAPI app through an ASGI adapter (Mangum); API Gateway routes every path to it. A browser cannot write to SQS directly, so the API is the only entry point.
   * The caller's `sub` always comes from the **verified JWT claims**, never from the request body. `job_id` is validated as a UUID before it is used in an S3 key. Otherwise a user could read or delete another user's `clips/{sub}/` prefix.
   * `GET /config`: returns the capability manifest (see "Capability manifest" below). The front end builds its form from it.
@@ -100,7 +100,7 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * Visibility Timeout: **3 minutes**, with a worker heartbeat that extends it (`ChangeMessageVisibility`) every minute while a job runs. A live worker keeps its job. A dead worker frees it within about 3 minutes.
   * Redrive policy: `maxReceiveCount = 5`, then the message moves to the DLQ. Every receive counts, including retries after a Spot release, so five in a row on one healthy job is needed to dead-letter it by mistake.
   * No results queue. The UI learns a clip is ready or failed by polling the API (section 3B).
-* **Dead-letter queue (`aws_sqs_queue`):** Receives jobs that failed 5 times. A CloudWatch alarm watches it so failures are visible.
+* **Dead-letter queue (`aws_sqs_queue`):** Receives jobs that failed 5 times. A CloudWatch alarm watches it and notifies an SNS topic with an email subscription to the owner, so failures are visible. The subscription must be confirmed from the email once after the first apply.
 * **Failure-marker Lambda:** Triggered by the DLQ (SQS event source mapping, $0 when idle). Reads `sub` and `job_id` from the message body and writes `clips/{sub}/{job_id}.failed` containing `{"code": "internal"}`. This covers deaths the worker could not report (out of memory, crash, Spot loss without warning).
 
 ### E. Compute & Orchestration (`terraform/ecr.tf`, `ecs.tf`, `compute.tf`)
@@ -113,14 +113,14 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * `StopTimeout`: 120 seconds. This is not enough to finish a job, so the worker aborts and releases its message on SIGTERM (section 4).
 * **Launch Template (`aws_launch_template`):**
   * AMI: official **Amazon ECS-optimized GPU AMI** (NVIDIA drivers and Docker runtime preinstalled).
-  * Instance types: diversified (`g4dn.xlarge`, `g5.xlarge`).
+  * Instance types: diversified (`g4dn.2xlarge`, `g5.2xlarge`). Both have 8 vCPU and 32 GB RAM, which the model needs (section 5), so the worker has one code path. The `.xlarge` sizes have only 16 GB RAM.
   * `ecs.config`: `ECS_ENABLE_SPOT_INSTANCE_DRAINING=true` so ECS drains the instance and sends SIGTERM on a Spot interruption notice.
   * Metadata options: `http_put_response_hop_limit = 2` so the worker container can reach IMDS (to poll for the Spot notice).
   * `user_data`: on every boot, formats and mounts the local NVMe instance store at `/data` (it is not mounted automatically and is wiped on stop/terminate), copies `models/<model-name>/` from the S3 models bucket via the Gateway Endpoint, then starts the ECS agent. Weights always live in S3 and are never kept on EBS.
-  * Size cap: weights plus working space must fit the instance store: `g4dn.xlarge` about 125 GB, `g5.xlarge` about 250 GB. Treat 125 GB as the limit while `g4dn` is in the mix. Larger weights mean changing the instance types, not adding EBS.
+  * Size cap: weights plus working space must fit the instance store: `g4dn.2xlarge` about 225 GB, `g5.2xlarge` about 450 GB. Treat 225 GB as the limit while `g4dn` is in the mix. Larger weights mean changing the instance types, not adding EBS.
   * Cold start: every Spot boot re-copies the weights (free, but it adds time roughly equal to weights size divided by S3 throughput) and pulls the multi-GB worker image from ECR.
 * **Auto Scaling Group (`aws_autoscaling_group`):**
-  * Min Size `0`, Max Size per concurrency needs (e.g., `2` or `5`), two AZs.
+  * Min Size `0`, Max Size `2`, two AZs. Max Size is the GPU cost ceiling: at most two clips render at once.
   * `mixed_instances_policy` over the g4dn/g5 types, Spot allocation `price-capacity-optimized`, on-demand base capacity 0.
   * `protect_from_scale_in = true` (required for the capacity provider's **managed termination protection**). The capacity provider uses managed scaling.
   * Group metrics enabled (`GroupInServiceInstances`).
@@ -277,6 +277,12 @@ Decided:
 * FastAPI runs as one Lambda behind an ASGI adapter (Mangum).
 * Pre-signed GET URL expiry: 6 hours, best-effort (see 3C).
 * Failures: DLQ (5 receives) + DLQ-triggered marker Lambda + worker fast path. Spot withdrawal is a release, not a failure.
+* Inference: Hugging Face `diffusers` (`WanPipeline`), not the original Wan repo code.
+* Worker instances: `g4dn.2xlarge` / `g5.2xlarge` (32 GB RAM needed by the model). ASG Max Size 2. DLQ alarm → SNS email; AWS Budgets email alert.
+* Worker image: built and pushed to ECR by hand with a script (`scripts/build_push.sh`). No CI deploy for v1.
+* CI: GitHub Actions runs `pytest` and `terraform fmt -check` / `terraform validate` on every push. It has no AWS credentials.
+* Front-end deploy: Terraform uploads `frontend/` to the web app bucket (`aws_s3_object`) and writes `config.json` from its own outputs (API URL, Cognito domain and client ID, CloudFront URL), so one `terraform apply` deploys everything. CloudFront caches for a short time (default TTL about 5 minutes) instead of needing invalidations.
+* Cognito users are created in the console. No custom domain: default `*.cloudfront.net` plus a Cognito prefix domain.
 * Per-user cost: structured usage logs (worker GPU seconds, API download bytes) in CloudWatch Logs with 90-day retention, summed per `sub` by a saved Logs Insights query and allocated against the monthly bill (see 3H). No database.
 
 Pre-deploy checklist:
@@ -286,8 +292,9 @@ Pre-deploy checklist:
 * **JWT verification:** the API Gateway JWT authorizer verifies the token. The Lambda takes `sub` from the claims and does not re-verify. The Lambda must have no public function URL, and its resource policy allows only API Gateway. A test asserts that a request with no claims is rejected.
 * **Single environment:** one deployment, no dev or staging stack. Risky changes are planned windows. Add a `dev` stack later if needed.
 * **Terraform state bootstrap:** `terraform/bootstrap/` with local state, applied once by hand. Creates the state bucket (versioning on, public access blocked) and the DynamoDB lock table. The main config uses them as remote state.
-* **Request a Spot service-quota increase** for "All G and VT Spot Instance Requests" in `us-west-2`. New accounts often have a limit of 0. `g4dn.xlarge` needs 4 vCPU each.
-* Model for v1: Wan 2.1 T2V 1.3B (text-to-video, no input slots), 480p output, on `g4dn.xlarge` (16 GB T4). Confirm it fits the 125 GB instance-store cap and measure T4 generation time in the first spike. Run in fp16; switch to fp32 only if the spike shows black or distorted frames. Image-to-video and avatar shapes follow later as manifest changes; the 14B model would need `g5.xlarge` (24 GB).
+* **Request a Spot service-quota increase** for "All G and VT Spot Instance Requests" in `us-west-2`. New accounts often have a limit of 0. `g4dn.2xlarge` and `g5.2xlarge` need 8 vCPU each, so Max Size 2 needs **16 vCPU**. The GPU spike also needs "Running On-Demand G and VT instances" quota if it runs on-demand.
+* **AWS Budgets alert:** a monthly cost budget (free for the first two budgets) with an email alert to the owner, in Terraform.
+* Model for v1: Wan 2.1 T2V 1.3B in Diffusers format (`Wan-AI/Wan2.1-T2V-1.3B-Diffusers`, Hugging Face commit `0fad780a534b6463e45facd96134c9f345acfa5b`, Apache-2.0, about 29 GB), text-to-video, no input slots, 480p (832x480) output, on `g4dn.2xlarge` (16 GB T4, 32 GB RAM) with `enable_model_cpu_offload`. In fp16 the components need about 13.4 GB (text encoder, with `wo` in fp32) + 2.8 GB (transformer) + 0.5 GB (VAE in fp32), about 16.7 GB. That fits neither the T4's usable VRAM nor the 16 GB RAM of the `.xlarge` sizes; with offload, each component moves to the GPU only while it runs, and 32 GB RAM holds all of them. The `.2xlarge` costs about $0.03–0.05/hr more on Spot than the `.xlarge` (about half a cent per clip). The worker runs it with `diffusers.WanPipeline`, with the `diffusers` version pinned (a NaN regression was reported after 0.35, diffusers issue #12612). The spike measures T4 generation time; an external T4 benchmark reports about 330 s for 33 frames and about 510 s for 81 frames at 30 steps. Precision: transformer and text encoder in fp16 (the T4 has no bf16), VAE in fp32. Transformers keeps the UMT5 `wo` layers in fp32 when loading in fp16, which avoids the known UMT5 fp16 overflow. Switch the transformer to fp32 only if the spike shows black or distorted frames. Frames: 16 fps and 4n+1 frames, so 3 s is 49 frames and 5 s is 81 frames. Image-to-video and avatar shapes follow later as manifest changes; the 14B model would need `g5.2xlarge` (24 GB VRAM) or larger.
 * Write `model_manifest.json` for the chosen model: `prompt` required, no input slots, and three user params: `seed` (int, optional), `duration_seconds` (enum, fixed list: 3 or 5; longer clips wait until the spike measures T4 speed). Resolution is fixed at 480p and not exposed.
 
 Open:
