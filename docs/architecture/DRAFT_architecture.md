@@ -77,7 +77,9 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
 
 ### C. Storage & Data Management (`terraform/storage.tf`)
 
-* **Model Weights S3 Bucket (`aws_s3_bucket`):**
+* **Model Weights S3 Bucket (outside the main Terraform stack):**
+  * Created by hand with the runbook (`docs/huggingFace_to_s3_instructions.md`, step 1a), not by Terraform. Getting weights from Hugging Face and storing them is a one-time data job, kept apart from the stack that runs the pipeline, so a `terraform destroy` or a refactor can never delete them.
+  * The main stack takes the bucket name as the variable `models_bucket_name` and reads it with a `data "aws_s3_bucket"` lookup, so `terraform plan` fails early if the bucket is missing. It uses the name only for the instance profile's read permission and the `user_data` copy path.
   * Storage Class: S3 Standard.
   * Key layout: `models/<model-name>/...`. The runbook's `S3_PREFIX` and the `user_data` copy path must both use this prefix.
   * Contents: base model weights, copied once from Hugging Face (see `docs/huggingFace_to_s3_instructions.md`). The pipeline never writes to it.
@@ -269,7 +271,7 @@ Decided:
 * Region `us-west-2`; FastAPI backend; public subnets with public IPs and an Internet Gateway (no NAT).
 * Result delivery: the UI polls the API, which checks S3 and returns a fresh pre-signed URL. No results queue.
 * Clip deletion: API deletes after download confirmation; 1-day lifecycle is the backstop.
-* Two S3 buckets (models, clips). User inputs go in the clips bucket under `inputs/`.
+* Two S3 buckets (models, clips). User inputs go in the clips bucket under `inputs/`. The models bucket and its weights are owned by the runbook, not the main Terraform stack, which only reads them (3C).
 * One model per deployment. The front end is driven by a capability manifest (`model_manifest.json`, section 3B), so text-to-video, image-to-video, video-to-video and avatar models share one UI.
 * Job visibility without a database: `.pending` marker written at submit, `GET /jobs` lists the user's prefix.
 * Front end: vanilla JS, no build step; testable with no backend through a mock `ApiClient`.
@@ -320,7 +322,7 @@ Do not use a single large `main.tf`. Organize by service domain, under `terrafor
 * `cognito.tf`: User Pool and App Client.
 * `cloudfront.tf`: web app bucket and CloudFront distribution.
 * `api.tf`: API Gateway HTTP API, JWT authorizer, API Lambda.
-* `storage.tf`: S3 buckets (models, clips) and lifecycle configuration.
+* `storage.tf`: clips S3 bucket and its lifecycle configuration, plus a read-only `data` lookup of the models bucket (created by the runbook, section 3C).
 * `sqs.tf`: SQS queue, DLQ and access policies.
 * `failure.tf`: failure-marker Lambda and its DLQ trigger.
 * `ecr.tf`: ECR repository.
@@ -328,7 +330,7 @@ Do not use a single large `main.tf`. Organize by service domain, under `terrafor
 * `compute.tf`: launch template and Auto Scaling Group.
 * `scaling.tf`: CloudWatch alarms and scaling policies.
 * `iam.tf`: roles and policies (section 3G).
-* `variables.tf` & `outputs.tf`: inputs and outputs (bucket names, VPC IDs, etc.).
+* `variables.tf` & `outputs.tf`: inputs and outputs (bucket names, VPC IDs, etc.). Inputs include `models_bucket_name`.
 
 `model_manifest.json` sits outside `terraform/` and is read by it (`file()` + `jsonencode`) to set the API Lambda and ECS task environment (section 3B). The static app lives in `frontend/` and is uploaded to the web app bucket.
 

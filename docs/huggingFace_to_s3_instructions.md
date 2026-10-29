@@ -16,7 +16,7 @@ Set these once in your local shell. Keep them the same across all steps.
 
 ```bash
 export REGION=us-west-2
-export BUCKET=aivideogen-models-610588468668   # S3 names are global; pick a unique one and use it everywhere
+export BUCKET=aivideogen-models-477656043770   # S3 names are global; pick a unique one and use it everywhere
 export MODEL=wan2-1-t2v-1-3b                        # must match models/<model-name>/ in user_data and model_manifest.json
 export HF_REPO=Wan-AI/Wan2.1-T2V-1.3B-Diffusers
 export HF_SHA=0fad780a534b6463e45facd96134c9f345acfa5b
@@ -40,7 +40,7 @@ aws s3api put-public-access-block --bucket "$BUCKET" \
   BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 ```
 
-When `terraform/storage.tf` is written later, import this bucket into Terraform instead of creating a second one.
+This runbook owns the bucket. The main Terraform stack never creates, changes or deletes it: it takes the name as the variable `models_bucket_name` and only reads from it, so the weights survive a `terraform destroy`.
 
 ### 1b. Create the temporary instance's IAM role
 
@@ -170,7 +170,7 @@ Set the variables again in the new shell (they are not inherited from your lapto
 
 ```bash
 export REGION=us-west-2
-export BUCKET=aivideogen-models-610588468668   # same value as Step 1
+export BUCKET=aivideogen-models-477656043770   # same value as Step 1
 export MODEL=wan2-1-t2v-1-3b
 export HF_REPO=Wan-AI/Wan2.1-T2V-1.3B-Diffusers
 export HF_SHA=0fad780a534b6463e45facd96134c9f345acfa5b
