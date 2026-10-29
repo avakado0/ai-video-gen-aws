@@ -122,7 +122,7 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * Size cap: weights plus working space must fit the instance store: `g4dn.2xlarge` about 225 GB, `g5.2xlarge` about 450 GB. Treat 225 GB as the limit while `g4dn` is in the mix. Larger weights mean changing the instance types, not adding EBS.
   * Cold start: every Spot boot re-copies the weights (free, but it adds time roughly equal to weights size divided by S3 throughput) and pulls the multi-GB worker image from ECR.
 * **Auto Scaling Group (`aws_autoscaling_group`):**
-  * Min Size `0`, Max Size `2`, two AZs. Max Size is the GPU cost ceiling: at most two clips render at once.
+  * Min Size `0`, Max Size from the variable `gpu_max` (`2` in production), two AZs. Max Size is the GPU cost ceiling: at most two clips render at once. `gpu_max` defaults to `0`, so the whole stack can be deployed and tested before GPU launches are possible (Paid plan and Spot quota, section 5); jobs then stay queued.
   * `mixed_instances_policy` over the g4dn/g5 types, Spot allocation `price-capacity-optimized`, on-demand base capacity 0.
   * `protect_from_scale_in = true` (required for the capacity provider's **managed termination protection**). The capacity provider uses managed scaling.
   * Group metrics enabled (`GroupInServiceInstances`).
@@ -137,6 +137,7 @@ SQS depth ─► CloudWatch alarm / metric math ─► ECS Service Auto Scaling 
 * The Application Auto Scaling target for the ECS service has `min_capacity = 0`.
 * **0 → 1 (wake-up):** CloudWatch alarm on `ApproximateNumberOfMessagesVisible >= 1`. A step scaling policy sets the ECS service desired count from 0 to 1.
 * **1 → N:** target tracking with CloudWatch metric math: (`ApproximateNumberOfMessagesVisible` + `ApproximateNumberOfMessagesNotVisible`) divided by the ASG's `GroupInServiceInstances` (one task per GPU instance), targeting a small number of jobs per task. No custom Lambda. The ECS `RunningTaskCount` metric is not used because it needs paid Container Insights. (Pure target tracking cannot wake up from 0 because of division by zero, hence the step policy above.)
+* **Idle wait:** a GPU instance should stop about **15 minutes** after the queue empties, so a follow-up request skips the 5–10 minute cold start (an idle window costs about $0.06). ECS managed scaling already waits roughly 15 minutes before removing an instance with no tasks, so the service's own scale-in to 0 should be quick. Measure the real idle time in the first deploy and tune.
 * **Scale-in to 0:** the metric must use visible **+ not-visible** messages. A message being processed is not visible, so visible alone reads 0 while a job is running and would scale the service to zero mid-job. Also protect running tasks with ECS task scale-in protection (`UpdateTaskProtection`) while a job is active.
 
 ### G. IAM (`terraform/iam.tf`)
@@ -280,8 +281,11 @@ Decided:
 * Pre-signed GET URL expiry: 6 hours, best-effort (see 3C).
 * Failures: DLQ (5 receives) + DLQ-triggered marker Lambda + worker fast path. Spot withdrawal is a release, not a failure.
 * Inference: Hugging Face `diffusers` (`WanPipeline`), not the original Wan repo code.
-* Worker instances: `g4dn.2xlarge` / `g5.2xlarge` (32 GB RAM needed by the model). ASG Max Size 2. DLQ alarm → SNS email; AWS Budgets email alert.
-* Worker image: built and pushed to ECR by hand with a script (`scripts/build_push.sh`). No CI deploy for v1.
+* Worker instances: `g4dn.2xlarge` / `g5.2xlarge` (32 GB RAM needed by the model). ASG Max Size 2 (variable `gpu_max`). DLQ alarm → SNS email; AWS Budgets email alert (console).
+* Worker image: built and pushed to ECR by hand with a script (`scripts/build_push.sh`). No CI deploy for v1. Built on the owner's machine first (needs about 15–25 GB free disk; the push is 6–10 GB). If the upload is too slow, the script runs on a temporary `m7i-flex.large` (Free-eligible) instead, deleted afterwards.
+* Terraform credentials: a dedicated IAM user `terraform-deployer` (AdministratorAccess, because Terraform creates IAM roles), access key in `~/.aws/credentials` only, never in the repo. `the-admin-user` stays console-only with MFA and no access key. No new AWS accounts and no IAM Identity Center (either would put the credit at risk).
+* Build order: the whole stack, GPU part included, is written and deployed now with `gpu_max = 0`. It is raised to `2` after the Paid plan and the Spot quota are in place.
+* GPU spike (does the model load on a T4, generation time, output quality): runs in a free Kaggle notebook (T4, about 30 GB RAM), not on AWS. The container, ECS and Spot handling are tested on AWS at first deploy.
 * CI: GitHub Actions runs `pytest` and `terraform fmt -check` / `terraform validate` on every push. It has no AWS credentials.
 * Front-end deploy: Terraform uploads `frontend/` to the web app bucket (`aws_s3_object`) and writes `config.json` from its own outputs (API URL, Cognito domain and client ID, CloudFront URL), so one `terraform apply` deploys everything. CloudFront caches for a short time (default TTL about 5 minutes) instead of needing invalidations.
 * Cognito users are created in the console. No custom domain: default `*.cloudfront.net` plus a Cognito prefix domain.
@@ -295,7 +299,8 @@ Pre-deploy checklist:
 * **Single environment:** one deployment, no dev or staging stack. Risky changes are planned windows. Add a `dev` stack later if needed.
 * **Terraform state bootstrap:** `terraform/bootstrap/` with local state, applied once by hand. Creates the state bucket (versioning on, public access blocked) and the DynamoDB lock table. The main config uses them as remote state.
 * **Request a Spot service-quota increase** for "All G and VT Spot Instance Requests" in `us-west-2`. New accounts often have a limit of 0. `g4dn.2xlarge` and `g5.2xlarge` need 8 vCPU each, so Max Size 2 needs **16 vCPU**. The GPU spike also needs "Running On-Demand G and VT instances" quota if it runs on-demand.
-* **AWS Budgets alert:** a monthly cost budget (free for the first two budgets) with an email alert to the owner, in Terraform.
+* **AWS Budgets alert:** a monthly cost budget (`$20`, 80% actual, email to the owner; free for the first two budgets), created by hand in the console before anything else. Not in Terraform.
+* **Free plan and GPU:** AWS documents only that the Free plan blocks "a subset" of offerings that could use up the credit; g4dn is not named. Ask AWS Support whether a Free plan account can launch `g4dn.2xlarge` Spot in `us-west-2`, and what the G/VT Spot quota is. Until answered, keep `gpu_max = 0`.
 * Model for v1: Wan 2.1 T2V 1.3B in Diffusers format (`Wan-AI/Wan2.1-T2V-1.3B-Diffusers`, Hugging Face commit `0fad780a534b6463e45facd96134c9f345acfa5b`, Apache-2.0, about 29 GB), text-to-video, no input slots, 480p (832x480) output, on `g4dn.2xlarge` (16 GB T4, 32 GB RAM) with `enable_model_cpu_offload`. In fp16 the components need about 13.4 GB (text encoder, with `wo` in fp32) + 2.8 GB (transformer) + 0.5 GB (VAE in fp32), about 16.7 GB. That fits neither the T4's usable VRAM nor the 16 GB RAM of the `.xlarge` sizes; with offload, each component moves to the GPU only while it runs, and 32 GB RAM holds all of them. The `.2xlarge` costs about $0.03–0.05/hr more on Spot than the `.xlarge` (about half a cent per clip). The worker runs it with `diffusers.WanPipeline`, with the `diffusers` version pinned (a NaN regression was reported after 0.35, diffusers issue #12612). The spike measures T4 generation time; an external T4 benchmark reports about 330 s for 33 frames and about 510 s for 81 frames at 30 steps. Precision: transformer and text encoder in fp16 (the T4 has no bf16), VAE in fp32. Transformers keeps the UMT5 `wo` layers in fp32 when loading in fp16, which avoids the known UMT5 fp16 overflow. Switch the transformer to fp32 only if the spike shows black or distorted frames. Frames: 16 fps and 4n+1 frames, so 3 s is 49 frames and 5 s is 81 frames. Image-to-video and avatar shapes follow later as manifest changes; the 14B model would need `g5.2xlarge` (24 GB VRAM) or larger.
 * Write `model_manifest.json` for the chosen model: `prompt` required, no input slots, and three user params: `seed` (int, optional), `duration_seconds` (enum, fixed list: 3 or 5; longer clips wait until the spike measures T4 speed). Resolution is fixed at 480p and not exposed.
 
@@ -330,7 +335,7 @@ Do not use a single large `main.tf`. Organize by service domain, under `terrafor
 * `compute.tf`: launch template and Auto Scaling Group.
 * `scaling.tf`: CloudWatch alarms and scaling policies.
 * `iam.tf`: roles and policies (section 3G).
-* `variables.tf` & `outputs.tf`: inputs and outputs (bucket names, VPC IDs, etc.). Inputs include `models_bucket_name`.
+* `variables.tf` & `outputs.tf`: inputs and outputs (bucket names, VPC IDs, etc.). Inputs include `models_bucket_name` and `gpu_max`.
 
 `model_manifest.json` sits outside `terraform/` and is read by it (`file()` + `jsonencode`) to set the API Lambda and ECS task environment (section 3B). The static app lives in `frontend/` and is uploaded to the web app bucket.
 
