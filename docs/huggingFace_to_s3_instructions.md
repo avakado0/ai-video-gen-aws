@@ -8,7 +8,7 @@ This document outlines the operational instructions to download your model weigh
 
 * An AWS account, and AWS CLI credentials on your own machine for the bucket and role setup in Step 1 (or do those steps in the AWS console).
 * A Hugging Face account (and an Access Token if downloading private or gated models like Llama or Stable Diffusion variants). For gated models, also accept the model's license on its Hugging Face page in the browser first. A token alone returns 403 until you do.
-* A temporary compute instance (an `m5.xlarge` running for under an hour costs well under a dollar).
+* A temporary compute instance (an `m7i-flex.large` running for under an hour costs well under a dollar).
 
 ### Variables used below
 
@@ -85,7 +85,7 @@ aws ec2 authorize-security-group-ingress --region "$REGION" --group-id "$SG_ID" 
 ### 1d. Launch the instance
 
 * **Region:** `us-west-2`, the same region as the bucket. The region must match exactly: a cross-region copy is billed as data transfer.
-* **Instance type:** `m5.xlarge` (or `c5.xlarge`). It has up to 10 Gbps network, so a 29 GB model copies in minutes. A `t3.medium` has only about 0.25 Gbps baseline (about 30 MB/s).
+* **Instance type:** `m7i-flex.large` (2 vCPU, 8 GB RAM, up to 12.5 Gbps network), so a 29 GB model copies in minutes. The account is on the AWS Free plan, which only launches Free-eligible types (`t3.micro`, `t3.small`, `t4g.micro`, `t4g.small`, `c7i-flex.large`, `m7i-flex.large`); `m5.xlarge` and `c5.xlarge` are refused. `t3.small` also works but has only about 0.25 Gbps baseline (about 30 MB/s), so the copy takes much longer. Check the list first: `aws ec2 describe-instance-types --region us-west-2 --filters Name=free-tier-eligible,Values=true --query "InstanceTypes[].InstanceType" --output text`. If `m7i-flex.large` is missing from it, stop and ask; do not upgrade the account to get around it.
 * **AMI:** **Amazon Linux 2023**. Do not use Amazon Linux 2: its `python3-pip` is Python 3.7, which installs an ancient `huggingface_hub` that may have no `hf` command.
 * **Extra EBS volume:** 40 GB `gp3`, which is the model (about 29 GB) plus headroom. The production cap is 225 GB, and this volume is only for this temporary instance. Production workers keep weights on the instance store, not EBS. **Delete on termination must be on**, or the volume survives Step 4 as a billed orphan.
 * **Shutdown behavior:** terminate. This makes `sudo shutdown -h now` at the end of Step 3 also end billing.
@@ -96,7 +96,7 @@ AMI_ID=$(aws ssm get-parameter --region "$REGION" \
   --query Parameter.Value --output text)
 
 INSTANCE_ID=$(aws ec2 run-instances --region "$REGION" \
-  --image-id "$AMI_ID" --instance-type m5.xlarge --count 1 \
+  --image-id "$AMI_ID" --instance-type m7i-flex.large --count 1 \
   --key-name hf-migration --security-group-ids "$SG_ID" \
   --iam-instance-profile Name=hf-migration-role \
   --instance-initiated-shutdown-behavior terminate \
