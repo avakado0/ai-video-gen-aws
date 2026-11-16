@@ -1,6 +1,5 @@
-# ECS (spec 3E, 3H): cluster, worker log group, task definition and the saved
-# per-user usage query. The service is added with scaling.tf, because it is
-# the thing that scaling drives and it needs the capacity provider (compute.tf).
+# ECS (spec 3E, 3H): cluster, worker log group, task definition, service and
+# the saved per-user usage query.
 
 resource "aws_ecs_cluster" "main" {
   name = local.ecs_cluster_name
@@ -84,4 +83,29 @@ resource "aws_cloudwatch_query_definition" "usage_per_user" {
     | stats sum(gpu_seconds) as gpu_seconds, sum(bytes) as bytes, count(*) as events by sub, instance_type
     | sort gpu_seconds desc
   EOT
+}
+
+# One task per GPU instance. desired_count starts at 0 and is driven entirely by
+# the scaling policies in scaling.tf, so Terraform must not reset it.
+resource "aws_ecs_service" "worker" {
+  name            = "aivideogen-worker"
+  cluster         = aws_ecs_cluster.main.id
+  task_definition = aws_ecs_task_definition.worker.arn
+  desired_count   = 0
+
+  capacity_provider_strategy {
+    capacity_provider = aws_ecs_capacity_provider.gpu.name
+    weight            = 1
+  }
+
+  # A new task definition replaces the task in place: one task fills the whole
+  # instance, so the new one cannot start until the old one stops.
+  deployment_minimum_healthy_percent = 0
+  deployment_maximum_percent         = 100
+
+  lifecycle {
+    ignore_changes = [desired_count]
+  }
+
+  depends_on = [aws_ecs_cluster_capacity_providers.main]
 }
