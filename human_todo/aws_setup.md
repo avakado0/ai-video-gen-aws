@@ -2,13 +2,19 @@
 
 Account `477656043770`, region `us-west-2`. Claude must not do these (console, credentials, Support).
 
-- [ ] Create the $20/month budget in the console (Billing → Budgets → Cost budget, monthly, fixed $20). Do this first.
+- [x] Create the $20/month budget in the console (Billing → Budgets → Cost budget, monthly, fixed $20). Do this first.
   - Under "Budget scope" / advanced options, **uncheck "Credits"** so the budget counts gross spend. Otherwise the $100 credit hides the spend and the budget never trips. Verify the checkbox in the console.
   - Alert 1: 80% of actual, email to you.
   - Alert 2: 100% of actual, email to you. The SNS topic is added to this alert after the first `terraform apply` (the topic lives in Terraform; see spec section 5, "AWS Budgets alert and cut-off"). Leave a reminder here: `- [ ] Attach the Terraform SNS topic to the 100% alert`.
+  - Done 2026-11-16: budget `aivideogen-monthly-20usd`, $20 monthly recurring. The console no longer has a "Credits" checkbox; the equivalent is a filter under Scope options: Charge type **Excludes** Credit, Refund (an Includes filter would miss Usage, which is not in the list). Verified on the saved budget. Both alerts (80% and 100%, actual) email the owner, and the email address is verified (budget alerts need that since 2026-09-30).
+- [ ] Attach the Terraform SNS topic to the budget's 100% alert (after the first `terraform apply`; output `budget_alert_topic_arn`).
 - [ ] Create IAM user `terraform-deployer`: no console access, policy AdministratorAccess, one access key. Save it with `aws configure --profile terraform-deployer` (it lands in `~/.aws/credentials`). Never paste the key into the repo or a chat.
 - [ ] Keep `the-admin-user` console-only, with MFA and no access key.
-- [ ] Add to the pending Support case: "On the Free plan, can I launch g4dn.2xlarge Spot instances in us-west-2, and what is my 'All G and VT Spot Instance Requests' quota?"
+- [x] ~~Add to the pending Support case: Free plan g4dn question~~ Answered 2026-11-10: g4dn needs Paid (see effort log, item 8).
+- [ ] Verify the Free plan end date in the console (Billing -> Account / plan details). The effort log has 2027-04-29 from a popup only. If the account closes then unless upgraded, the GPU go-live and upgrade must happen before it. Write the confirmed date here.
+- [ ] When ready for GPU work (not before): Billing -> Upgrade plan to Paid. One-way. Written human confirmation says the credit survives a manual upgrade. After it, check the Credits page still shows `10069756528` with expiry 2027-10-29.
+- [ ] After the upgrade: request the Spot quota "All G and VT Spot Instance Requests" in us-west-2 (16 vCPU for `gpu_max = 2`).
+- [ ] Never do Organizations, Control Tower, IAM Identity Center, APN or HIPAA/SEC, even after upgrade. AWS says to contact them first.
 - [ ] Make a Kaggle account and verify your phone number (needed for GPU notebooks), for the GPU spike.
 - [ ] Free up disk on your machine (at least 25 GB) before the first worker image build.
 
