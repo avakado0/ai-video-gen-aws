@@ -1,0 +1,86 @@
+# Build order
+
+Canonical build plan, written 2026-11-16 from the grilling session. Items are in dependency order. Owner: **H** = human (Claude must not do it), **C** = Claude. Tick a box only when its gate passes.
+
+Rules that apply to every phase:
+
+- TDD for application code: failing test first (pytest, `TestClient`, moto; fake SQS/S3 for the worker). Terraform's gate is `terraform fmt -check`, `terraform validate`, and a reviewed `terraform plan`.
+- Deploy everything with `gpu_max = 0` until phase 7.
+- Nothing here upgrades the plan, creates an Organization, or launches GPU or large instances (see CLAUDE.md banned actions).
+- One logical change per commit, added by path.
+
+Target: GPU go-live in November 2026 (owner's choice). Expect it to slip: the upgrade stays after the stack is built (decision 2026-11-16), and the Spot quota wait starts after it.
+
+## Phase 0: Human setup (Free plan safe)
+
+Steps are in `human_todo/aws_setup.md`.
+
+- [ ] H. Create the $20 gross-spend budget in the console, Credits unchecked, 80% email, 100% email. Gate: Credits box verified in the console.
+- [ ] H. Create IAM user `terraform-deployer` (no console, AdministratorAccess, one key) with `aws configure --profile terraform-deployer`. Fix or delete the invalid local CLI profile. Gate: `aws sts get-caller-identity --profile terraform-deployer` works.
+- [ ] H. Keep `the-admin-user` console-only with MFA and no key.
+- [ ] H. Create the Terraform state bucket in CloudShell and run the four verify commands. Check `terraform version` is 1.10 or newer. Gate: `terraform init` succeeds with the existing `backend.tf`.
+- [ ] H. Verify the Free plan end date in the console and write it in `human_todo/aws_setup.md`.
+- [ ] H. Free 25 GB of disk. Make a Kaggle account with phone verification.
+
+## Phase 1: Free Terraform, validate only
+
+Order follows resource dependencies. Gate for every file: `terraform fmt -check` and `terraform validate`; a reviewed `plan` once the profile works. No apply until phase 3.
+
+- [ ] C. `vpc.tf`: VPC, two public subnets, Internet Gateway, route table, S3 Gateway Endpoint (ADR 0002).
+- [ ] C. `storage.tf`: clips bucket, CORS, 1-day lifecycle on `clips/` and `inputs/`, read-only `data` lookup of the models bucket.
+- [ ] C. `sqs.tf`: queue (4 days, 3 min visibility, `maxReceiveCount = 8`), DLQ, DLQ alarm, SNS topic and email subscription.
+- [ ] C. `ecr.tf`: repository.
+- [ ] C. `iam.tf`: instance profile, task role, execution role, API role (with `s3:ListBucket`), failure Lambda role, budget Lambda role.
+- [ ] C. `failure.tf`: DLQ-triggered marker Lambda (test the handler first, TDD).
+- [ ] C. `budget.tf`: SNS topic with a `budgets.amazonaws.com` publish policy, cut-off Lambda, subscription (ADR 0004). Test the handler first.
+- [ ] C. `cloudfront.tf`: web bucket, distribution, then bucket policy as a separate resource.
+- [ ] C. `cognito.tf`: user pool (admin-create-only), public PKCE client, prefix domain, callback from the distribution's `domain_name`.
+- [ ] C. `api.tf`: HTTP API, JWT authorizer, Lambda with no function URL, resource policy for API Gateway only, log group (90 days).
+- [ ] C. `ecs.tf`, `compute.tf`, `scaling.tf`: cluster, capacity provider, task definition, launch template, ASG (`gpu_max`, `ignore_changes` on `max_size`), scaling alarms and policies, worker log group, saved Logs Insights query.
+- [ ] C. `outputs.tf`, and `config.json` upload last (generated in memory, never to disk).
+
+## Phase 2: Application code (TDD, in parallel with phase 1)
+
+- [ ] C. Write `model_manifest.json` for v1: prompt required, no slots, `seed`, `duration_seconds` (3 or 5), `negative_prompt` (max 200). Gate: manifest validator test.
+- [ ] C. API (FastAPI + Mangum, OOP, modular): `GET /config`, `POST /uploads`, `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `DELETE /jobs/{id}`. Tests assert the pre-signed POST policy conditions (moto does not enforce `content-length-range`), the 3-active-job cap, UUID validation, `sub` from claims only, and a no-claims request rejected.
+- [ ] C. Worker: poll, heartbeat, release on SIGTERM and Spot notice, `.failed` fast path, delete message after upload, usage log line per attempt. Tests with fake SQS/S3, no GPU.
+- [ ] C. Front end: show elapsed time and the "up to 20 minutes after idle" note on pending jobs (`frontend/js/jobs.js`). Tests in mock mode.
+- [ ] C. CI: GitHub Actions running pytest, `terraform fmt -check`, `terraform validate`, no AWS credentials.
+
+## Phase 3: First deploy at `gpu_max = 0`
+
+- [ ] H. Review the `terraform plan` output. Gate: no NAT, ALB or interface endpoint, no GPU instance.
+- [ ] H. `terraform apply` with the `terraform-deployer` profile.
+- [ ] H. Confirm the SNS email subscription. Attach the Terraform SNS topic to the budget's 100% alert.
+- [ ] H. Create Cognito users in the console.
+- [ ] C. Run the front end in real mode against the deployed API. Jobs stay queued; that is expected.
+
+## Phase 4: Weights and image
+
+- [ ] H. Run the models runbook on an `m7i-flex.large`: create the models bucket, copy weights, verify the byte count, tear down the temporary role, key, security group and instance. Expect a fix or two.
+- [ ] C. Write `scripts/build_push.sh`. Choose and pin the CUDA base image by digest to match the ECS GPU AMI driver.
+- [ ] H. Build and push the worker image (about 15-25 GB free disk, 6-10 GB push).
+
+## Phase 5: GPU spike (before the first real job)
+
+- [ ] C. Write the Kaggle T4 notebook with a pass/fail table.
+- [ ] H. Run it. Record: loads at all, generation time at 3 s and 5 s, black or distorted frames, VAE fp32 behaviour. Gate: decide the final `duration_seconds` list; if the T4 is too slow, revisit the instance mix (`g5.2xlarge`).
+
+## Phase 6: Upgrade and quota (the critical path)
+
+- [ ] H. Manually upgrade to Paid. One-way. Gate: Credits page still shows `10069756528`, expiry 2027-10-29. Only after phases 3-5 (decision 2026-11-16).
+- [ ] H. Request the Spot quota "All G and VT Spot Instance Requests" in us-west-2: 16 vCPU.
+- [ ] H. Wait for approval. Do not raise `gpu_max` before it.
+
+## Phase 7: GPU go-live
+
+- [ ] H. Tell Claude the cost, then set `gpu_max = 1` and apply. Run one job end to end. Measure cold start, idle time before scale-in, and cost per clip (spec gaps G7, G10).
+- [ ] H. Test the budget cut-off Lambda and that the ASG `ignore_changes` keeps it.
+- [ ] H. Test a Spot release path if possible, and check the usage log lines per user.
+- [ ] H. Raise `gpu_max` to 2.
+- [ ] C. Update README and CLAUDE.md with real commands and measured numbers. Update the spec's cold-start and idle numbers.
+
+## Off-path human items
+
+- [ ] H. Update the draw.io diagram: input-upload path, SNS and Budgets (`human_todo/update_diagram.md`).
+- [ ] H. Decide whether to close the idle account `308374654798` after the models migration works.
