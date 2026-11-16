@@ -1,0 +1,22 @@
+#!/bin/bash
+# Runs once per boot, before the ECS agent registers (spec 3E).
+# 1. Format and mount the local NVMe instance store at /data (wiped on stop).
+# 2. Copy the model weights from S3 (free over the gateway endpoint).
+# 3. Only then write the ECS config. Until /etc/ecs/ecs.config names this
+#    cluster, the agent joins "default" and receives no tasks, so a failed copy
+#    can never start a job without weights.
+set -euo pipefail
+
+DEV=$(ls /dev/disk/by-id/nvme-Amazon_EC2_NVMe_Instance_Storage_* | head -n 1)
+mkfs.xfs -f "$DEV"
+mkdir -p /data
+mount "$DEV" /data
+
+mkdir -p /data/models
+aws s3 sync "s3://${models_bucket}/models/" /data/models/ --region "${region}" --only-show-errors
+
+cat >> /etc/ecs/ecs.config <<CFG
+ECS_CLUSTER=${cluster_name}
+ECS_ENABLE_SPOT_INSTANCE_DRAINING=true
+ECS_ENABLE_GPU_SUPPORT=true
+CFG
