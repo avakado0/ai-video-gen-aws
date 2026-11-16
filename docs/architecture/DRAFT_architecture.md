@@ -103,7 +103,7 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * Redrive policy: `maxReceiveCount = 8`, then the message moves to the DLQ. Every receive counts, including retries after a Spot release, so eight in a row on one healthy job are needed to dead-letter it by mistake.
   * No results queue. The UI learns a clip is ready or failed by polling the API (section 3B).
 * **Dead-letter queue (`aws_sqs_queue`):** Receives jobs that failed 8 times. A CloudWatch alarm watches it and notifies an SNS topic with an email subscription to the owner, so failures are visible. The alarm uses `NumberOfMessagesReceived >= 1` (1-minute period), not the visible count, because the failure-marker Lambda drains the DLQ within seconds and a visible-count sample could miss the message. Verify it fires in the first deploy. The owner's address is the sensitive variable `alert_email`, set in a git-ignored `.tfvars`. The subscription must be confirmed from the email once after the first apply.
-* **Failure-marker Lambda:** Triggered by the DLQ (SQS event source mapping, $0 when idle). Reads `sub` and `job_id` from the message body and writes `clips/{sub}/{job_id}.failed` containing `{"code": "internal"}`. This covers deaths the worker could not report (out of memory, crash, Spot loss without warning).
+* **Failure-marker Lambda:** Triggered by the DLQ (SQS event source mapping, $0 when idle). Reads `sub` and `job_id` from the message body and writes `clips/{sub}/{job_id}.failed` containing `{"code": "internal", "message": "The job could not be completed."}` (generic: no prompt or internals reach the UI). This covers deaths the worker could not report (out of memory, crash, Spot loss without warning). Both IDs must be 36-character hyphenated hex, because they become part of an S3 key; the API applies the same rule before it writes, so keys match. A message that cannot be parsed or fails that check is logged and dropped (retrying cannot help). The mapping uses `ReportBatchItemFailures`, so only a record whose S3 write failed is retried. Python 3.12, 128 MB, 10 s timeout, concurrency capped at 2; the DLQ visibility timeout is 60 s to cover the timeout. Source in `lambdas/failure_marker/`, tests in `tests/failure_marker/`, zipped by Terraform with the `archive` provider.
 
 ### E. Compute & Orchestration (`terraform/ecr.tf`, `ecs.tf`, `compute.tf`)
 
@@ -345,7 +345,7 @@ Do not use a single large `main.tf`. Organize by service domain, under `terrafor
 
 ### 3. Provider Version Locking
 
-* Pin the AWS provider (e.g., `version = "~> 5.0"`) in `provider.tf`. Major provider updates can introduce breaking changes.
+* Pin the AWS provider (e.g., `version = "~> 5.0"`) in `provider.tf`, and the `archive` provider (`~> 2.4`) that zips the Lambda sources. Major provider updates can introduce breaking changes.
 
 ### 4. Consistent Tagging Strategy
 
