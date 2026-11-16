@@ -142,11 +142,11 @@ SQS depth ─► CloudWatch alarm / metric math ─► ECS Service Auto Scaling 
 
 ### G. IAM (`terraform/iam.tf`)
 
-* **EC2 instance profile:** ECS agent permissions, plus `s3:GetObject` and `s3:ListBucket` on the models bucket (for the `user_data` copy).
+* **EC2 instance profile:** ECS agent permissions (AWS managed `AmazonEC2ContainerServiceforEC2Role`), plus `s3:GetObject` on `models/*` and `s3:ListBucket` on the models bucket limited to the prefix `models/*` (for the `user_data` copy, which must therefore list with a `models/` prefix).
 * **ECS task role (worker):** `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` on the queue; `s3:PutObject` on `clips/*` in the clips bucket; `s3:GetObject` and `s3:DeleteObject` on `inputs/*`; `ecs:UpdateTaskProtection`.
 * **ECS task execution role:** pull from ECR, write CloudWatch Logs.
 * **API Lambda role:** `sqs:SendMessage`; on the clips bucket `s3:GetObject`, `s3:PutObject` (the `.pending` marker and the pre-signed upload POST), `s3:DeleteObject`, and **`s3:ListBucket`**. Without `ListBucket`, a HEAD on a missing key returns 403 instead of 404, and "pending" would look like an error.
-* **Failure-marker Lambda role:** `sqs:ReceiveMessage`/`DeleteMessage` on the DLQ; `s3:PutObject` on `clips/*`.
+* **Failure-marker Lambda role:** `sqs:ReceiveMessage`/`DeleteMessage`/`GetQueueAttributes` on the DLQ (the event source mapping needs `GetQueueAttributes`); `s3:PutObject` on `clips/*`.
 * **Budget cut-off Lambda role (`budget.tf`):** `autoscaling:UpdateAutoScalingGroup` scoped to this stack's ASG ARN only, plus CloudWatch Logs.
 
 ### H. Per-User Cost Attribution (`terraform/ecs.tf`, `api.tf`, `failure.tf`)
