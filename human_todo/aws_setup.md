@@ -34,7 +34,8 @@ Account `477656043770`, region `us-west-2`. Claude must not do these (console, c
 ```
 
   - Deactivate the access key when you are not deploying, and reactivate it for an apply. Rotate it after the first few deploys.
-- [ ] Keep `the-admin-user` console-only, with MFA and no access key.
+- [x] Keep `the-admin-user` console-only, with MFA and no access key. Checked 2026-11-16: MFA assigned, no access keys.
+- Local profiles seen: `idefault` (likely a typo), `atlas-polly` (another project), `terraform-deployer`. Run Terraform with `export AWS_PROFILE=terraform-deployer`.
 - [x] ~~Add to the pending Support case: Free plan g4dn question~~ Answered 2026-11-10: g4dn needs Paid (see effort log, item 8).
 - [ ] Verify the Free plan end date in the console (Billing -> Account / plan details). The effort log has 2027-04-29 from a popup only. If the account closes then unless upgraded, the GPU go-live and upgrade must happen before it. Write the confirmed date here.
 - [ ] When ready for GPU work (not before): Billing -> Upgrade plan to Paid. One-way. Written human confirmation says the credit survives a manual upgrade. After it, check the Credits page still shows `10069756528` with expiry 2027-10-29.
