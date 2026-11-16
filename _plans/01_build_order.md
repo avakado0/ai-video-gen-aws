@@ -28,7 +28,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 - [ ] C. `vpc.tf`: VPC, two public subnets, Internet Gateway, route table, S3 Gateway Endpoint (ADR 0002).
 - [ ] C. `storage.tf`: clips bucket, 1-day lifecycle on `clips/` and `inputs/`, read-only `data` lookup of the models bucket. Written, validate passes. The clips-bucket CORS resource is added in the `cloudfront.tf` step, because its origin is the distribution domain.
-- [ ] C. `sqs.tf`: queue (4 days, 3 min visibility, `maxReceiveCount = 8`), DLQ, DLQ alarm, SNS topic and email subscription.
+- [ ] C. `sqs.tf`: queue (4 days, 3 min visibility, `maxReceiveCount = 8`), DLQ, DLQ alarm, SNS topic and email subscription. Written, validate passes. Needs `alert_email` in a git-ignored `.tfvars` before `plan`.
 - [ ] C. `ecr.tf`: repository.
 - [ ] C. `iam.tf`: instance profile, task role, execution role, API role (with `s3:ListBucket`), failure Lambda role, budget Lambda role.
 - [ ] C. `failure.tf`: DLQ-triggered marker Lambda (test the handler first, TDD).
