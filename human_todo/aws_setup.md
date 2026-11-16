@@ -9,6 +9,31 @@ Account `477656043770`, region `us-west-2`. Claude must not do these (console, c
   - Done 2026-11-16: budget `aivideogen-monthly-20usd`, $20 monthly recurring. The console no longer has a "Credits" checkbox; the equivalent is a filter under Scope options: Charge type **Excludes** Credit, Refund (an Includes filter would miss Usage, which is not in the list). Verified on the saved budget. Both alerts (80% and 100%, actual) email the owner, and the email address is verified (budget alerts need that since 2026-09-30).
 - [ ] Attach the Terraform SNS topic to the budget's 100% alert (after the first `terraform apply`; output `budget_alert_topic_arn`).
 - [ ] Create IAM user `terraform-deployer`: no console access, policy AdministratorAccess, one access key. Save it with `aws configure --profile terraform-deployer` (it lands in `~/.aws/credentials`). Never paste the key into the repo or a chat.
+- [ ] Add the guard policy to `terraform-deployer` (IAM -> Users -> terraform-deployer -> Permissions -> Add permissions -> Create inline policy -> JSON, name `deny-credit-burning-actions`). An explicit Deny beats AdministratorAccess, so even this key cannot do the actions CLAUDE.md bans (an Organization or Identity Center would auto-upgrade the account and expire the credit):
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "DenyCreditBurningActions",
+      "Effect": "Deny",
+      "Action": [
+        "organizations:*",
+        "controltower:*",
+        "sso:*",
+        "sso-directory:*",
+        "identitystore:*",
+        "aws-marketplace:*",
+        "account:CloseAccount"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+  - Deactivate the access key when you are not deploying, and reactivate it for an apply. Rotate it after the first few deploys.
 - [ ] Keep `the-admin-user` console-only, with MFA and no access key.
 - [x] ~~Add to the pending Support case: Free plan g4dn question~~ Answered 2026-11-10: g4dn needs Paid (see effort log, item 8).
 - [ ] Verify the Free plan end date in the console (Billing -> Account / plan details). The effort log has 2027-04-29 from a popup only. If the account closes then unless upgraded, the GPU go-live and upgrade must happen before it. Write the confirmed date here.
