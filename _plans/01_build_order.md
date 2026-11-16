@@ -27,13 +27,13 @@ Steps are in `human_todo/aws_setup.md`.
 Order follows resource dependencies. Gate for every file: `terraform fmt -check` and `terraform validate`; a reviewed `plan` once the profile works. No apply until phase 3.
 
 - [ ] C. `vpc.tf`: VPC, two public subnets, Internet Gateway, route table, S3 Gateway Endpoint (ADR 0002).
-- [ ] C. `storage.tf`: clips bucket, 1-day lifecycle on `clips/` and `inputs/`, read-only `data` lookup of the models bucket. Written, validate passes. The clips-bucket CORS resource is added in the `cloudfront.tf` step, because its origin is the distribution domain.
+- [ ] C. `storage.tf`: clips bucket, 1-day lifecycle on `clips/` and `inputs/`, read-only `data` lookup of the models bucket. Written, validate passes. The clips-bucket CORS resource is in `cloudfront.tf`, because its origin is the distribution domain.
 - [ ] C. `sqs.tf`: queue (4 days, 3 min visibility, `maxReceiveCount = 8`), DLQ, DLQ alarm, SNS topic and email subscription. Written, validate passes. Needs `alert_email` in a git-ignored `.tfvars` before `plan`.
 - [ ] C. `ecr.tf`: repository. Written, validate passes. Keeps the latest 3 images; tags are mutable, so `build_push.sh` may reuse a tag.
 - [ ] C. `iam.tf`: instance profile, task role, execution role, API role (with `s3:ListBucket`), failure Lambda role. Written, validate passes. The budget Lambda role lives in `budget.tf` (spec 3G).
 - [ ] C. `failure.tf`: DLQ-triggered marker Lambda (test the handler first, TDD). Written: 22 tests pass (`.venv/bin/pytest`), validate passes, zip checked in a scratch copy.
 - [ ] C. `budget.tf`: SNS topic with a `budgets.amazonaws.com` publish policy, cut-off Lambda, subscription (ADR 0004). Test the handler first. Written: 7 handler tests, validate passes. The budget's own 100% alert still has to be pointed at this topic by hand after the first apply.
-- [ ] C. `cloudfront.tf`: web bucket, distribution, then bucket policy as a separate resource. Also add the clips-bucket CORS resource (browser `POST` from the distribution origin) to `storage.tf`.
+- [ ] C. `cloudfront.tf`: web bucket, distribution, then bucket policy as a separate resource. Written, validate passes. The clips-bucket CORS resource (browser `POST`/`GET`/`HEAD` from the distribution origin) and the upload of `frontend/` (minus the mock `config.json`) are in this file too.
 - [ ] C. `cognito.tf`: user pool (admin-create-only), public PKCE client, prefix domain, callback from the distribution's `domain_name`.
 - [ ] C. `api.tf`: HTTP API, JWT authorizer, Lambda with no function URL, resource policy for API Gateway only, log group (90 days).
 - [ ] C. `ecs.tf`, `compute.tf`, `scaling.tf`: cluster, capacity provider, task definition, launch template, ASG (`gpu_max`, `ignore_changes` on `max_size`), scaling alarms and policies, worker log group, saved Logs Insights query.
