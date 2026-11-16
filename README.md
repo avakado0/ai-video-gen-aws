@@ -2,8 +2,8 @@
 
 A cost-optimized, serverless-front / GPU-back architecture for generating AI video clips on demand. The design goal is **near-zero cost when idle**: GPU capacity only exists while jobs are in the queue.
 
-> **Status: design complete, infrastructure code not started.**
-> The architecture spec and diagram are done. Terraform, the API and the worker are planned (see [Roadmap](#roadmap)). This README will be updated as each part lands.
+> **Status: design complete, infrastructure code just started.**
+> The architecture spec, diagram and front end are done. Terraform has its backend, provider and variables; the API and the worker are planned (see [Roadmap](#roadmap)). This README will be updated as each part lands.
 
 ![Architecture diagram](System_Diagrams/FINAL-AI%20Video%20Gen%20System.drawio.png)
 
@@ -55,7 +55,8 @@ docs/
   architecture/DRAFT_architecture.md   Architecture spec (source of truth)
   huggingFace_to_s3_instructions.md    Runbook: copy model weights from Hugging Face to S3
 System_Diagrams/                       draw.io diagrams (FINAL is current)
-terraform/                             Planned, not yet created
+terraform/                             In progress: backend, provider, variables so far
+frontend/                              Static web app (vanilla JS, mock mode)
 ```
 
 ## Roadmap
