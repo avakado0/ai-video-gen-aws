@@ -7,6 +7,10 @@ resource "aws_sqs_queue" "dlq" {
   # be at least the source queue's 4 days. 14 days is the maximum and is free.
   message_retention_seconds = 14 * 24 * 3600
   sqs_managed_sse_enabled   = true
+
+  # Must be at least the failure Lambda's timeout (10 s), or the event source
+  # mapping is rejected. A failed write is retried after this long.
+  visibility_timeout_seconds = 60
 }
 
 resource "aws_sqs_queue" "jobs" {
