@@ -24,7 +24,7 @@
 [API Gateway HTTP API (JWT authorizer)] ──► [Lambda: FastAPI]
        │ SendMessage                          │ HEAD / presign / delete
        ▼                                      ▼
-[Amazon SQS Queue] ──(after 5 receives)──► [DLQ] ──► [Lambda: failure marker] ──► writes .failed to Clips bucket
+[Amazon SQS Queue] ──(after 8 receives)──► [DLQ] ──► [Lambda: failure marker] ──► writes .failed to Clips bucket
        │ (CloudWatch alarms ──► ECS Service Auto Scaling ──► ECS Capacity Provider ──► ASG)
        ▼
 [ECS Cluster (EC2 Launch Type)] ──► [Auto Scaling Group, min 0] (spans 2 AZs, public subnets)
@@ -100,9 +100,9 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * Standard queue for task buffering.
   * Retention Period: 4 days.
   * Visibility Timeout: **3 minutes**, with a worker heartbeat that extends it (`ChangeMessageVisibility`) every minute while a job runs. A live worker keeps its job. A dead worker frees it within about 3 minutes.
-  * Redrive policy: `maxReceiveCount = 5`, then the message moves to the DLQ. Every receive counts, including retries after a Spot release, so five in a row on one healthy job is needed to dead-letter it by mistake.
+  * Redrive policy: `maxReceiveCount = 8`, then the message moves to the DLQ. Every receive counts, including retries after a Spot release, so eight in a row on one healthy job are needed to dead-letter it by mistake.
   * No results queue. The UI learns a clip is ready or failed by polling the API (section 3B).
-* **Dead-letter queue (`aws_sqs_queue`):** Receives jobs that failed 5 times. A CloudWatch alarm watches it and notifies an SNS topic with an email subscription to the owner, so failures are visible. The subscription must be confirmed from the email once after the first apply.
+* **Dead-letter queue (`aws_sqs_queue`):** Receives jobs that failed 8 times. A CloudWatch alarm watches it and notifies an SNS topic with an email subscription to the owner, so failures are visible. The subscription must be confirmed from the email once after the first apply.
 * **Failure-marker Lambda:** Triggered by the DLQ (SQS event source mapping, $0 when idle). Reads `sub` and `job_id` from the message body and writes `clips/{sub}/{job_id}.failed` containing `{"code": "internal"}`. This covers deaths the worker could not report (out of memory, crash, Spot loss without warning).
 
 ### E. Compute & Orchestration (`terraform/ecr.tf`, `ecs.tf`, `compute.tf`)
@@ -186,7 +186,7 @@ The worker handles one job at a time. Spot withdrawal is a **release, not a fail
 * **With the 2-minute warning** (IMDS `spot/instance-action`, or SIGTERM from ECS via Spot draining): the worker stops generating and calls `ChangeMessageVisibility(VisibilityTimeout=0)`. The job is retried immediately on a replacement instance.
 * **Without warning** (hardware failure, instance vanishes): the worker cannot act. The message reappears after the visibility timeout (about 3 minutes, since the heartbeat stops). The job is delayed, not lost.
 * **Permanent job error** (e.g., invalid prompt, corrupt image or video, no face found in an avatar image, expired input): the worker writes `clips/{sub}/{job_id}.failed` with a JSON reason (`{"code": "invalid_input", "field", "message"}`) and deletes the message (fast path).
-* **Unexpected error or hard crash:** the message is released or reappears and is retried. After 5 receives it moves to the DLQ and the failure-marker Lambda writes the `.failed` marker (section 3D).
+* **Unexpected error or hard crash:** the message is released or reappears and is retried. After 8 receives it moves to the DLQ and the failure-marker Lambda writes the `.failed` marker (section 3D).
 
 ```python
 # Pseudo-code for the containerized worker (illustrative only)
@@ -280,7 +280,7 @@ Decided:
 * Model weights always live in S3 and are copied to the EC2 instance store at boot. No EBS for weights.
 * FastAPI runs as one Lambda behind an ASGI adapter (Mangum).
 * Pre-signed GET URL expiry: 6 hours, best-effort (see 3C).
-* Failures: DLQ (5 receives) + DLQ-triggered marker Lambda + worker fast path. Spot withdrawal is a release, not a failure.
+* Failures: DLQ (8 receives) + DLQ-triggered marker Lambda + worker fast path. Spot withdrawal is a release, not a failure.
 * Inference: Hugging Face `diffusers` (`WanPipeline`), not the original Wan repo code.
 * Worker instances: `g4dn.2xlarge` / `g5.2xlarge` (32 GB RAM needed by the model). ASG Max Size 2 (variable `gpu_max`). DLQ alarm → SNS email; AWS Budgets email alert (console).
 * Worker image: built and pushed to ECR by hand with a script (`scripts/build_push.sh`). No CI deploy for v1. Built on the owner's machine first (needs about 15–25 GB free disk; the push is 6–10 GB). If the upload is too slow, the script runs on a temporary `m7i-flex.large` (Free-eligible) instead, deleted afterwards.
