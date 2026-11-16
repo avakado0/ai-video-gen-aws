@@ -30,7 +30,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 - [ ] C. `storage.tf`: clips bucket, 1-day lifecycle on `clips/` and `inputs/`, read-only `data` lookup of the models bucket. Written, validate passes. The clips-bucket CORS resource is added in the `cloudfront.tf` step, because its origin is the distribution domain.
 - [ ] C. `sqs.tf`: queue (4 days, 3 min visibility, `maxReceiveCount = 8`), DLQ, DLQ alarm, SNS topic and email subscription. Written, validate passes. Needs `alert_email` in a git-ignored `.tfvars` before `plan`.
 - [ ] C. `ecr.tf`: repository. Written, validate passes. Keeps the latest 3 images; tags are mutable, so `build_push.sh` may reuse a tag.
-- [ ] C. `iam.tf`: instance profile, task role, execution role, API role (with `s3:ListBucket`), failure Lambda role, budget Lambda role.
+- [ ] C. `iam.tf`: instance profile, task role, execution role, API role (with `s3:ListBucket`), failure Lambda role. Written, validate passes. The budget Lambda role lives in `budget.tf` (spec 3G).
 - [ ] C. `failure.tf`: DLQ-triggered marker Lambda (test the handler first, TDD).
 - [ ] C. `budget.tf`: SNS topic with a `budgets.amazonaws.com` publish policy, cut-off Lambda, subscription (ADR 0004). Test the handler first.
 - [ ] C. `cloudfront.tf`: web bucket, distribution, then bucket policy as a separate resource. Also add the clips-bucket CORS resource (browser `POST` from the distribution origin) to `storage.tf`.
