@@ -5,5 +5,5 @@ When the monthly gross-spend budget reaches 100%, the alert publishes to an SNS 
 ## Consequences
 
 - It is a brake, not a hard cap: Budgets data lags by hours, and running instances finish their current job.
-- Terraform must `ignore_changes` on the ASG `max_size`, or the next `apply` undoes the cut-off. Re-enabling means hand-setting `gpu_max` back after reviewing the bill.
+- Terraform must `ignore_changes` on the ASG `max_size`, or the next `apply` undoes the cut-off. `gpu_max` therefore only sets the ASG's *initial* `max_size` (decided 2026-11-16): raising or restoring the limit later is done by hand (`aws autoscaling update-auto-scaling-group --auto-scaling-group-name aivideogen-gpu --max-size N`, or the console), never by `terraform apply`. Re-enabling after a cut-off means doing that after reviewing the bill. We rejected dropping the ignore, because an unrelated `apply` would then silently re-enable GPUs after a cut-off.
 - The budget itself is created by hand in the console with credits excluded, so it still trips while the credit absorbs the bill. The topic, Lambda and role live in `budget.tf`.

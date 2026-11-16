@@ -22,7 +22,7 @@ variable "models_bucket_name" {
 }
 
 variable "gpu_max" {
-  description = "ASG Max Size, the GPU cost ceiling. 0 until the Paid plan and the G/VT Spot quota are in place; 2 in production."
+  description = "Initial ASG Max Size, the GPU cost ceiling. Leave at 0. The ASG ignores later changes to max_size (ADR 0004), so raise the live limit by CLI or console, not by editing this."
   type        = number
   default     = 0
 

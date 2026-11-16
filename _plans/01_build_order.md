@@ -70,14 +70,14 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 - [ ] H. Manually upgrade to Paid. One-way. Gate: Credits page still shows `10069756528`, expiry 2027-10-29. Only after phases 3-5 (decision 2026-11-16).
 - [ ] H. Request the Spot quota "All G and VT Spot Instance Requests" in us-west-2: 16 vCPU.
-- [ ] H. Wait for approval. Do not raise `gpu_max` before it.
+- [ ] H. Wait for approval. Do not raise the ASG max size before it.
 
 ## Phase 7: GPU go-live
 
-- [ ] H. Tell Claude the cost, then set `gpu_max = 1` and apply. Run one job end to end. Measure cold start, idle time before scale-in, and cost per clip (spec gaps G7, G10).
+- [ ] H. Tell Claude the cost, then raise the ASG limit by hand: `aws autoscaling update-auto-scaling-group --auto-scaling-group-name aivideogen-gpu --max-size 1 --profile terraform-deployer` (Terraform ignores `max_size`, ADR 0004). Run one job end to end. Measure cold start, idle time before scale-in, and cost per clip (spec gaps G7, G10).
 - [ ] H. Test the budget cut-off Lambda and that the ASG `ignore_changes` keeps it.
 - [ ] H. Test a Spot release path if possible, and check the usage log lines per user.
-- [ ] H. Raise `gpu_max` to 2.
+- [ ] H. Raise the ASG `--max-size` to 2 the same way.
 - [ ] C. Update README and CLAUDE.md with real commands and measured numbers. Update the spec's cold-start and idle numbers.
 
 ## Off-path human items
