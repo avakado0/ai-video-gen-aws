@@ -4,6 +4,12 @@ variable "region" {
   default     = "us-west-2"
 }
 
+variable "vpc_cidr" {
+  description = "CIDR block of the VPC. Two /24 public subnets are carved from it."
+  type        = string
+  default     = "10.0.0.0/16"
+}
+
 variable "models_bucket_name" {
   description = "Name of the models bucket created by the runbook. Read-only here; Terraform never creates, changes or deletes it."
   type        = string
