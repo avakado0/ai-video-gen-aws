@@ -10,6 +10,12 @@ variable "vpc_cidr" {
   default     = "10.0.0.0/16"
 }
 
+variable "alert_email" {
+  description = "Owner email for DLQ alerts. Set it in a git-ignored terraform.tfvars or TF_VAR_alert_email, never in a committed file."
+  type        = string
+  sensitive   = true
+}
+
 variable "models_bucket_name" {
   description = "Name of the models bucket created by the runbook. Read-only here; Terraform never creates, changes or deletes it."
   type        = string
