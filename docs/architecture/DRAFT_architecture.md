@@ -296,7 +296,7 @@ Decided:
 
 Pre-deploy checklist:
 
-* **Test doubles:** moto for AWS calls in pytest. Spike first: confirm moto supports pre-signed POST and `ChangeMessageVisibility`. If not, use a hand-written fake for only those calls.
+* **Test doubles:** moto for AWS calls in pytest. Spike done 2026-11-16 (moto 5.2.5, boto3 1.44.3): moto accepts a pre-signed POST upload, supports `ChangeMessageVisibility(0)` redelivery with `ApproximateReceiveCount`, redrive to a DLQ, and returns 404 on a HEAD of a missing key. It does **not** enforce the POST policy's `content-length-range` (a 50-byte upload against a 5-byte limit returns 204). So API tests assert the generated policy's conditions (decode `fields["policy"]`), not S3 enforcement. moto also cannot show the 403-without-`ListBucket` behaviour, so that rule is checked in the Terraform IAM review, not by tests. No hand-written fake is needed.
 * **Worker CUDA base image:** chosen to match the NVIDIA driver on the deployed ECS GPU AMI, and pinned by digest. Re-check the match whenever the AMI changes.
 * **JWT verification:** the API Gateway JWT authorizer verifies the token. The Lambda takes `sub` from the claims and does not re-verify. The Lambda must have no public function URL, and its resource policy allows only API Gateway. A test asserts that a request with no claims is rejected.
 * **Single environment:** one deployment, no dev or staging stack. Risky changes are planned windows. Add a `dev` stack later if needed.
