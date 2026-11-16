@@ -119,6 +119,8 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * `ecs.config`: `ECS_ENABLE_SPOT_INSTANCE_DRAINING=true` so ECS drains the instance and sends SIGTERM on a Spot interruption notice.
   * Metadata options: `http_put_response_hop_limit = 2` so the worker container can reach IMDS (to poll for the Spot notice).
   * `user_data`: on every boot, formats and mounts the local NVMe instance store at `/data` (it is not mounted automatically and is wiped on stop/terminate), copies `models/<model-name>/` from the S3 models bucket via the Gateway Endpoint, then starts the ECS agent. Weights always live in S3 and are never kept on EBS.
+  * Gate: `user_data` writes `/etc/ecs/ecs.config` (naming the cluster) only after the weights copy succeeds. Until then the agent joins `default` and gets no tasks, so a failed copy cannot start a job without weights. Unverified: the `aws` CLI is present on the AMI, and the agent starts after `user_data`. Check both in the first GPU boot.
+  * Root volume: 60 GB encrypted gp3 EBS (holds the worker image, not the weights), deleted on termination.
   * Size cap: weights plus working space must fit the instance store: `g4dn.2xlarge` about 225 GB, `g5.2xlarge` about 450 GB. Treat 225 GB as the limit while `g4dn` is in the mix. Larger weights mean changing the instance types, not adding EBS.
   * Cold start: every Spot boot re-copies the weights (free, but it adds time roughly equal to weights size divided by S3 throughput) and pulls the multi-GB worker image from ECR.
 * **Auto Scaling Group (`aws_autoscaling_group`):**
@@ -138,6 +140,7 @@ SQS depth ─► CloudWatch alarm / metric math ─► ECS Service Auto Scaling 
 * **0 → 1 (wake-up):** CloudWatch alarm on `ApproximateNumberOfMessagesVisible >= 1`. A step scaling policy sets the ECS service desired count from 0 to 1.
 * **1 → N:** target tracking with CloudWatch metric math: (`ApproximateNumberOfMessagesVisible` + `ApproximateNumberOfMessagesNotVisible`) divided by the ASG's `GroupInServiceInstances` (one task per GPU instance), targeting a small number of jobs per task. No custom Lambda. The ECS `RunningTaskCount` metric is not used because it needs paid Container Insights. (Pure target tracking cannot wake up from 0 because of division by zero, hence the step policy above.)
 * **Idle wait:** a GPU instance should stop about **15 minutes** after the queue empties, so a follow-up request skips the 5–10 minute cold start (an idle window costs about $0.06). ECS managed scaling already waits roughly 15 minutes before removing an instance with no tasks, so the service's own scale-in to 0 should be quick. Measure the real idle time in the first deploy and tune.
+* **Target:** one job per GPU instance (`target_value = 1`), scale-out cooldown 60 s, scale-in cooldown 300 s. The ECS service replaces its task in place on a new task definition (min healthy 0%, max 100%).
 * **Scale-in to 0:** the metric must use visible **+ not-visible** messages. A message being processed is not visible, so visible alone reads 0 while a job is running and would scale the service to zero mid-job. Also protect running tasks with ECS task scale-in protection (`UpdateTaskProtection`) while a job is active.
 
 ### G. IAM (`terraform/iam.tf`)
