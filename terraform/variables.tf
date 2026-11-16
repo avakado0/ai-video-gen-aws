@@ -31,3 +31,15 @@ variable "gpu_max" {
     error_message = "gpu_max must be a whole number from 0 to 2."
   }
 }
+
+# Fixed names shared across files. Policies in iam.tf and budget.tf are scoped
+# by these names rather than by resource references, because the ASG and the
+# cluster depend on those roles and a reference would create a cycle.
+locals {
+  ecs_cluster_name      = "aivideogen"
+  asg_name              = "aivideogen-gpu"
+  api_log_group         = "/aws/lambda/aivideogen-api"
+  failure_log_group     = "/aws/lambda/aivideogen-failure-marker"
+  budget_log_group      = "/aws/lambda/aivideogen-budget-cutoff"
+  worker_log_group_name = "/aivideogen/worker"
+}
