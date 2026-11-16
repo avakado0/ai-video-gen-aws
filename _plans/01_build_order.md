@@ -35,7 +35,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 - [ ] C. `budget.tf`: SNS topic with a `budgets.amazonaws.com` publish policy, cut-off Lambda, subscription (ADR 0004). Test the handler first. Written: 7 handler tests, validate passes. The budget's own 100% alert still has to be pointed at this topic by hand after the first apply.
 - [ ] C. `cloudfront.tf`: web bucket, distribution, then bucket policy as a separate resource. Written, validate passes. The clips-bucket CORS resource (browser `POST`/`GET`/`HEAD` from the distribution origin) and the upload of `frontend/` (minus the mock `config.json`) are in this file too.
 - [ ] C. `cognito.tf`: user pool (admin-create-only), public PKCE client, prefix domain, callback from the distribution's `domain_name`. Written, validate passes.
-- [ ] C. `api.tf`: HTTP API, JWT authorizer, Lambda with no function URL, resource policy for API Gateway only, log group (90 days).
+- [ ] C. `api.tf`: HTTP API, JWT authorizer, Lambda with no function URL, resource policy for API Gateway only, log group (90 days). Written with a placeholder handler (`lambdas/api/`, returns 501); validate passes. Still to do in phase 2: the real FastAPI app, a dependency-packaging method for the zip (`archive_file` cannot `pip install`), and the `model_manifest.json` env var.
 - [ ] C. `ecs.tf`, `compute.tf`, `scaling.tf`: cluster, capacity provider, task definition, launch template, ASG (`gpu_max`, `ignore_changes` on `max_size`), scaling alarms and policies, worker log group, saved Logs Insights query.
 - [ ] C. `outputs.tf`, and `config.json` upload last (generated in memory, never to disk).
 
