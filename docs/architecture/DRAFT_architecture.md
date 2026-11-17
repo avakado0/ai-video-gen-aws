@@ -313,7 +313,7 @@ Pre-deploy checklist:
 
 Open:
 
-* None at present.
+* **fp16 copies of the weights (deferred, raised in review 2026-11-17).** Every boot copies about 29 GB from S3 to NVMe, most of it fp32 (the text encoder dominates). The worker loads the transformer and text encoder in fp16 anyway, so storing fp16 copies would roughly halve the copy (my estimate; the VAE stays fp32, and the UMT5 `wo` layers stay fp32). Not done yet: the copy is maybe 1 to 3 minutes of the cold start (my estimate; not measured), and instance launch and the image pull may cost as much. Decide after the first deploy measures the cold start. If the copy dominates, convert once (shard by shard, so it fits a small instance), confirm in the Kaggle spike that output is unchanged, and add the step to the runbook.
 
 ---
 
