@@ -40,6 +40,8 @@ aws s3api put-public-access-block --bucket "$BUCKET" \
   BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true
 ```
 
+**Done 2026-11-17** (created early and empty, because the first `terraform plan` needs the bucket to exist for its `data` lookup). Skip 1a when running the rest of the runbook.
+
 This runbook owns the bucket. The main Terraform stack never creates, changes or deletes it: it takes the name as the variable `models_bucket_name` and only reads from it, so the weights survive a `terraform destroy`.
 
 ### 1b. Create the temporary instance's IAM role
