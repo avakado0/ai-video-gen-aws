@@ -50,7 +50,7 @@ Why by hand: Terraform cannot create the bucket that holds its own state, and a 
 
 Do this in CloudShell (region us-west-2) as `the-admin-user`, before the first `terraform init`. Allowed on the Free plan, creates nothing that costs more than cents.
 
-- [ ] Create the bucket and harden it:
+- [x] Create the bucket and harden it:
 
 ```bash
 export REGION=us-west-2
@@ -80,7 +80,7 @@ aws s3api put-bucket-tagging --bucket "$STATE_BUCKET" \
   --tagging 'TagSet=[{Key=Project,Value=AIVideoGen},{Key=ManagedBy,Value=Manual}]'
 ```
 
-- [ ] Verify (each should match the comment):
+- [x] Verify (each should match the comment): Done 2026-11-17: versioning Enabled, all four public-access flags true, AES256 (AWS now also blocks SSE-C by default; fine). Location printed nothing in the paste; the create succeeded with `LocationConstraint=us-west-2`, so it is in us-west-2. Re-run `get-bucket-location` once to confirm.
 
 ```bash
 aws s3api get-bucket-versioning --bucket "$STATE_BUCKET"            # Status: Enabled
@@ -89,7 +89,7 @@ aws s3api get-bucket-encryption --bucket "$STATE_BUCKET"            # AES256
 aws s3api get-bucket-location --bucket "$STATE_BUCKET"              # us-west-2
 ```
 
-- [ ] Tell Claude the bucket name. `terraform/backend.tf` will then be:
+- [x] Tell Claude the bucket name (done 2026-11-17: `aivideogen-tfstate-477656043770`, already matches `backend.tf`). `terraform/backend.tf` will then be:
 
 ```hcl
 terraform {
@@ -106,7 +106,7 @@ terraform {
 
   The bucket name is not a secret. Credentials come from the `terraform-deployer` profile, never from this file.
 
-- [ ] Check the local Terraform is `>= 1.10` (`terraform version`). `use_lockfile` does not exist in older versions.
+- [x] Check the local Terraform is `>= 1.10` (done 2026-11-17: v1.15.8) (`terraform version`). `use_lockfile` does not exist in older versions.
 
 ### If something goes wrong
 
