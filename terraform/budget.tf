@@ -34,7 +34,7 @@ resource "aws_sns_topic_policy" "budget" {
   policy = data.aws_iam_policy_document.budget_topic.json
 }
 
-# ---- Role: update this stack's ASG only, plus logs ---------------------------
+# ---- Role: zero this stack's ASG, worker service and its autoscaling, plus logs ---------------------------
 
 resource "aws_iam_role" "budget" {
   name               = "aivideogen-budget-cutoff"
@@ -48,6 +48,21 @@ data "aws_iam_policy_document" "budget" {
     sid       = "ZeroTheGpuGroup"
     actions   = ["autoscaling:UpdateAutoScalingGroup"]
     resources = ["arn:${data.aws_partition.current.partition}:autoscaling:${var.region}:${local.account_id}:autoScalingGroup:*:autoScalingGroupName/${local.asg_name}"]
+  }
+  # Zeroing the ASG alone does not stop a protected instance while the service
+  # still wants its task, so the worker service is zeroed too (ADR 0004).
+  statement {
+    sid       = "ZeroTheWorkerService"
+    actions   = ["ecs:UpdateService", "ecs:DescribeServices"]
+    resources = ["arn:${data.aws_partition.current.partition}:ecs:${var.region}:${local.account_id}:service/${local.ecs_cluster_name}/${local.ecs_service_name}"]
+  }
+  # Scalable-target ARNs carry a random ID, so this cannot be scoped by name.
+  # Unverified until phase 7: RegisterScalableTarget may also need cloudwatch
+  # alarm permissions on an existing ECS target.
+  statement {
+    sid       = "ZeroTheServiceAutoscaling"
+    actions   = ["application-autoscaling:RegisterScalableTarget", "application-autoscaling:DescribeScalableTargets"]
+    resources = ["*"]
   }
   statement {
     sid       = "WriteLogs"
@@ -89,7 +104,9 @@ resource "aws_lambda_function" "budget_cutoff" {
 
   environment {
     variables = {
-      ASG_NAME = local.asg_name
+      ASG_NAME    = local.asg_name
+      ECS_CLUSTER = local.ecs_cluster_name
+      ECS_SERVICE = local.ecs_service_name
     }
   }
 

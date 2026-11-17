@@ -38,6 +38,7 @@ variable "gpu_max" {
 locals {
   ecs_cluster_name      = "aivideogen"
   asg_name              = "aivideogen-gpu"
+  ecs_service_name      = "aivideogen-worker"
   api_log_group         = "/aws/lambda/aivideogen-api"
   failure_log_group     = "/aws/lambda/aivideogen-failure-marker"
   budget_log_group      = "/aws/lambda/aivideogen-budget-cutoff"

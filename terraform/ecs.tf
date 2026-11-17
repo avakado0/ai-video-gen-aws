@@ -88,7 +88,7 @@ resource "aws_cloudwatch_query_definition" "usage_per_user" {
 # One task per GPU instance. desired_count starts at 0 and is driven entirely by
 # the scaling policies in scaling.tf, so Terraform must not reset it.
 resource "aws_ecs_service" "worker" {
-  name            = "aivideogen-worker"
+  name            = local.ecs_service_name
   cluster         = aws_ecs_cluster.main.id
   task_definition = aws_ecs_task_definition.worker.arn
   desired_count   = 0
