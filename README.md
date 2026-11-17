@@ -38,7 +38,7 @@ These are the tradeoffs the design is built around.
 - **Failure reporting without a database.** A permanent error makes the worker write `clips/{sub}/{job_id}.failed` itself. Crashes and repeated failures end up in the DLQ, and a Lambda writes the same marker. `GET /jobs/{id}` reports `ready`, `failed` or `pending` from S3 alone.
 - **Per-user isolation.** The API takes the user's `sub` from verified JWT claims, never from the request body, and validates `job_id` as a UUID, so users can't reach each other's `clips/{sub}/` prefix.
 - **Model weights live in S3 and are copied to instance-store NVMe on boot.** No EBS volumes to pay for or snapshot. The 225 GB `g4dn.2xlarge` instance store is the size cap.
-- **Pre-signed URLs are minted by the API Lambda, not the worker.** URLs signed with EC2 role credentials die when those credentials rotate, so the API signs a fresh 6-hour URL on every request.
+- **Pre-signed URLs are minted by the API Lambda, not the worker.** Any pre-signed URL dies when the credentials that signed it expire, and the Lambda's temporary credentials can expire before the 6-hour `ExpiresIn` too. What makes it work is that the API signs a fresh URL on every `GET /jobs/{job_id}`, and the client re-requests on a 403. A worker signs once, at upload, and cannot refresh.
 
 ## Cost model
 
