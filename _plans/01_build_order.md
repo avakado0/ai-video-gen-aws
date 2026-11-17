@@ -32,7 +32,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 - [ ] C. `ecr.tf`: repository. Written, validate passes. Keeps the latest 3 images; tags are mutable, so `build_push.sh` may reuse a tag.
 - [ ] C. `iam.tf`: instance profile, task role, execution role, API role (with `s3:ListBucket`), failure Lambda role. Written, validate passes. The budget Lambda role lives in `budget.tf` (spec 3G).
 - [ ] C. `failure.tf`: DLQ-triggered marker Lambda (test the handler first, TDD). Written: 22 tests pass (`.venv/bin/pytest`), validate passes, zip checked in a scratch copy.
-- [ ] C. `budget.tf`: SNS topic with a `budgets.amazonaws.com` publish policy, cut-off Lambda, subscription (ADR 0004). Test the handler first. Written: 7 handler tests, validate passes. The budget's own 100% alert still has to be pointed at this topic by hand after the first apply.
+- [ ] C. `budget.tf`: SNS topic with a `budgets.amazonaws.com` publish policy, cut-off Lambda, subscription (ADR 0004). Test the handler first. Written: handler tests and validate pass. Amended 2026-11-17: also zeroes the ECS service and its autoscaling max (14 handler tests), because zeroing the ASG alone cannot stop a protected instance. The budget's own 100% alert still has to be pointed at this topic by hand after the first apply.
 - [ ] C. `cloudfront.tf`: web bucket, distribution, then bucket policy as a separate resource. Written, validate passes. The clips-bucket CORS resource (browser `POST`/`GET`/`HEAD` from the distribution origin) and the upload of `frontend/` (minus the mock `config.json`) are in this file too.
 - [ ] C. `cognito.tf`: user pool (admin-create-only), public PKCE client, prefix domain, callback from the distribution's `domain_name`. Written, validate passes.
 - [ ] C. `api.tf`: HTTP API, JWT authorizer, Lambda with no function URL, resource policy for API Gateway only, log group (90 days). Written with a placeholder handler (`lambdas/api/`, returns 501); validate passes. Still to do in phase 2: the real FastAPI app, a dependency-packaging method for the zip (`archive_file` cannot `pip install`), and the `model_manifest.json` env var.
@@ -75,7 +75,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 ## Phase 7: GPU go-live
 
 - [ ] H. Tell Claude the cost, then raise the ASG limit by hand: `aws autoscaling update-auto-scaling-group --auto-scaling-group-name aivideogen-gpu --max-size 1 --profile terraform-deployer` (Terraform ignores `max_size`, ADR 0004). Run one job end to end. Measure cold start, idle time before scale-in, and cost per clip (spec gaps G7, G10).
-- [ ] H. Test the budget cut-off Lambda and that the ASG `ignore_changes` keeps it.
+- [ ] H. Test the budget cut-off Lambda with a job running and one queued: the task must stop, the instance must terminate, and an `apply` must not undo the zeros (ASG `max_size` and autoscaling `max_capacity` are ignored). Then restore both limits by hand (commands in ADR 0004). Also confirms whether the role needs CloudWatch alarm permissions.
 - [ ] H. Test a Spot release path if possible, and check the usage log lines per user.
 - [ ] H. Raise the ASG `--max-size` to 2 the same way.
 - [ ] C. Update README and CLAUDE.md with real commands and measured numbers. Update the spec's cold-start and idle numbers.
