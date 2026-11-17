@@ -18,7 +18,7 @@ Steps are in `human_todo/aws_setup.md`.
 - [x] H. Create the $20 gross-spend budget in the console, Credits unchecked, 80% email, 100% email. Gate: Credits box verified in the console. Done 2026-11-16: the console has no Credits checkbox now, so the budget uses a Charge type Excludes Credit, Refund filter; email verified.
 - [x] H. Create IAM user `terraform-deployer` (no console, AdministratorAccess, one key) with `aws configure --profile terraform-deployer`. Fix or delete the invalid local CLI profile. Gate: `aws sts get-caller-identity --profile terraform-deployer` works. Done 2026-11-16, with an inline Deny guard policy (Organizations, Control Tower, Identity Center, Marketplace, CloseAccount).
 - [x] H. Keep `the-admin-user` console-only with MFA and no key.
-- [ ] H. Create the Terraform state bucket in CloudShell and run the four verify commands. Check `terraform version` is 1.10 or newer. Gate: `terraform init` succeeds with the existing `backend.tf`.
+- [ ] H. Create the Terraform state bucket in CloudShell and run the four verify commands. Check `terraform version` is 1.10 or newer. Gate: `terraform init` succeeds with the existing `backend.tf`. Progress 2026-11-17: bucket `aivideogen-tfstate-477656043770` created and verified, Terraform v1.15.8. Remaining: the `terraform init` gate.
 - [ ] H. Verify the Free plan end date in the console and write it in `human_todo/aws_setup.md`.
 - [ ] H. Free 25 GB of disk. Make a Kaggle account with phone verification.
 
