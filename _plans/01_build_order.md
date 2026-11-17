@@ -57,7 +57,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 ## Phase 4: Weights and image
 
-- [ ] H. Run the models runbook on an `m7i-flex.large`: create the models bucket, copy weights, verify the byte count, tear down the temporary role, key, security group and instance. Expect a fix or two.
+- [ ] H. Run the models runbook on an `m7i-flex.large`: create the models bucket (done early 2026-11-17, empty), copy weights, verify the byte count, tear down the temporary role, key, security group and instance. Expect a fix or two.
 - [ ] C. Write `scripts/build_push.sh`. Choose and pin the CUDA base image by digest to match the ECS GPU AMI driver.
 - [ ] H. Build and push the worker image (about 15-25 GB free disk, 6-10 GB push).
 
