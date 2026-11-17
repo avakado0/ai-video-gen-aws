@@ -16,6 +16,9 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
+# Saved binary plans hold sensitive values (e.g. alert_email) in plain text
+tfplan
+*.tfplan
 # .terraform.lock.hcl is intentionally NOT ignored: commit it to pin provider versions
 
 # Secrets
