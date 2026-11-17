@@ -28,7 +28,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 - [ ] C. `vpc.tf`: VPC, two public subnets, Internet Gateway, route table, S3 Gateway Endpoint (ADR 0002).
 - [ ] C. `storage.tf`: clips bucket, 1-day lifecycle on `clips/` and `inputs/`, read-only `data` lookup of the models bucket. Written, validate passes. The clips-bucket CORS resource is in `cloudfront.tf`, because its origin is the distribution domain.
-- [ ] C. `sqs.tf`: queue (4 days, 3 min visibility, `maxReceiveCount = 8`), DLQ, DLQ alarm, SNS topic and email subscription. Written, validate passes. Needs `alert_email` in a git-ignored `.tfvars` before `plan`.
+- [ ] C. `sqs.tf`: queue (1 day since 2026-11-17, was 4 days; 3 min visibility, `maxReceiveCount = 8`), DLQ, DLQ alarm, SNS topic and email subscription. Written, validate passes. Needs `alert_email` in a git-ignored `.tfvars` before `plan`.
 - [ ] C. `ecr.tf`: repository. Written, validate passes. Keeps the latest 3 images; tags are mutable, so `build_push.sh` may reuse a tag.
 - [ ] C. `iam.tf`: instance profile, task role, execution role, API role (with `s3:ListBucket`), failure Lambda role. Written, validate passes. The budget Lambda role lives in `budget.tf` (spec 3G).
 - [ ] C. `failure.tf`: DLQ-triggered marker Lambda (test the handler first, TDD). Written: 22 tests pass (`.venv/bin/pytest`), validate passes, zip checked in a scratch copy.
@@ -43,7 +43,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 - [ ] C. Write `model_manifest.json` for v1: prompt required, no slots, `seed`, `duration_seconds` (3 or 5), `negative_prompt` (max 200). Gate: manifest validator test.
 - [ ] C. API (FastAPI + Mangum, OOP, modular): `GET /config`, `POST /uploads`, `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `DELETE /jobs/{id}`. Tests assert the pre-signed POST policy conditions (moto does not enforce `content-length-range`), the 3-active-job cap, UUID validation, `sub` from claims only, and a no-claims request rejected.
-- [ ] C. Worker: poll, heartbeat, release on SIGTERM and Spot notice, `.failed` fast path, delete message after upload, usage log line per attempt. Tests with fake SQS/S3, no GPU.
+- [ ] C. Worker: poll, skip a job whose `.pending` marker is gone (delete the message, no GPU work), heartbeat, release on SIGTERM and Spot notice, `.failed` fast path, delete message after upload, usage log line per attempt. Tests with fake SQS/S3, no GPU.
 - [ ] C. Front end: show elapsed time and the "up to 20 minutes after idle" note on pending jobs (`frontend/js/jobs.js`). Tests in mock mode.
 - [ ] C. CI: GitHub Actions running pytest, `terraform fmt -check`, `terraform validate`, no AWS credentials.
 
@@ -74,6 +74,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 ## Phase 7: GPU go-live
 
+- [ ] H. Purge the job queue first: `aws sqs purge-queue --queue-url <queue_url output> --profile terraform-deployer`. Test jobs queued during phases 3 to 6 would otherwise run at go-live (the worker's marker check is the second line of defence).
 - [ ] H. Tell Claude the cost, then raise the ASG limit by hand: `aws autoscaling update-auto-scaling-group --auto-scaling-group-name aivideogen-gpu --max-size 1 --profile terraform-deployer` (Terraform ignores `max_size`, ADR 0004). Run one job end to end. Measure cold start, idle time before scale-in, and cost per clip (spec gaps G7, G10).
 - [ ] H. Test the budget cut-off Lambda with a job running and one queued: the task must stop, the instance must terminate, and an `apply` must not undo the zeros (ASG `max_size` and autoscaling `max_capacity` are ignored). Then restore both limits by hand (commands in ADR 0004). Also confirms whether the role needs CloudWatch alarm permissions.
 - [ ] H. Test a Spot release path if possible, and check the usage log lines per user.

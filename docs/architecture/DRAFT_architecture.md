@@ -98,7 +98,7 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
 
 * **Amazon SQS Queue (`aws_sqs_queue`):**
   * Standard queue for task buffering.
-  * Retention Period: 4 days.
+  * Retention Period: 1 day, matching the 1-day lifecycle on the `.pending` marker and inputs (decided 2026-11-17; was 4 days). A message that outlived its marker would run a job its owner can no longer see, then reappear in `GET /jobs` as an `.mp4`. A Spot drought longer than a day drops the job, but by then its marker is gone anyway. The worker also skips stale jobs (section 4).
   * Visibility Timeout: **3 minutes**, with a worker heartbeat that extends it (`ChangeMessageVisibility`) every minute while a job runs. A live worker keeps its job. A dead worker frees it within about 3 minutes.
   * Redrive policy: `maxReceiveCount = 8`, then the message moves to the DLQ. Every receive counts, including retries after a Spot release, so eight in a row on one healthy job are needed to dead-letter it by mistake.
   * No results queue. The UI learns a clip is ready or failed by polling the API (section 3B).
@@ -146,7 +146,7 @@ SQS depth ─► CloudWatch alarm / metric math ─► ECS Service Auto Scaling 
 ### G. IAM (`terraform/iam.tf`)
 
 * **EC2 instance profile:** ECS agent permissions (AWS managed `AmazonEC2ContainerServiceforEC2Role`), plus `s3:GetObject` on `models/*` and `s3:ListBucket` on the models bucket limited to the prefix `models/*` (for the `user_data` copy, which must therefore list with a `models/` prefix).
-* **ECS task role (worker):** `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` on the queue; `s3:PutObject` on `clips/*` in the clips bucket; `s3:GetObject` and `s3:DeleteObject` on `inputs/*`; `ecs:UpdateTaskProtection`.
+* **ECS task role (worker):** `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` on the queue; `s3:PutObject` on `clips/*` in the clips bucket; `s3:GetObject` and `s3:DeleteObject` on `inputs/*`; `s3:GetObject` on `clips/*.pending` and `s3:ListBucket` on the clips bucket (stale-job check, section 4); `ecs:UpdateTaskProtection`.
 * **ECS task execution role:** pull from ECR, write CloudWatch Logs.
 * **API Lambda role:** `sqs:SendMessage`; on the clips bucket `s3:GetObject`, `s3:PutObject` (the `.pending` marker and the pre-signed upload POST), `s3:DeleteObject`, and **`s3:ListBucket`**. Without `ListBucket`, a HEAD on a missing key returns 403 instead of 404, and "pending" would look like an error.
 * **Failure-marker Lambda role:** `sqs:ReceiveMessage`/`DeleteMessage`/`GetQueueAttributes` on the DLQ (the event source mapping needs `GetQueueAttributes`); `s3:PutObject` on `clips/*`.
@@ -188,6 +188,7 @@ The worker handles one job at a time. Spot withdrawal is a **release, not a fail
 
 * **With the 2-minute warning** (IMDS `spot/instance-action`, or SIGTERM from ECS via Spot draining): the worker stops generating and calls `ChangeMessageVisibility(VisibilityTimeout=0)`. The job is retried immediately on a replacement instance.
 * **Without warning** (hardware failure, instance vanishes): the worker cannot act. The message reappears after the visibility timeout (about 3 minutes, since the heartbeat stops). The job is delayed, not lost.
+* **Stale job:** before any GPU work, the worker HEADs `clips/{sub}/{job_id}.pending`. If the HEAD returns 404 (lifecycle expiry, or the user deleted the job), it deletes the message and does nothing else. Any other error, a 403 included, is a normal error and the job is retried, so a permission mistake never silently drops jobs. The task role has `s3:GetObject` on `clips/*.pending` and unconditional `s3:ListBucket` on the clips bucket (without it a missing key returns 403): no `.failed` marker, no clip. This also stops queued test jobs from phases 3 to 6 from burning GPU time at go-live, and keeps the 3-job cap from leaking (an expired marker's message never produces a clip). Lifecycle expiry is asynchronous, so a marker can outlive its day slightly; the check is what matters, not the timing.
 * **Permanent job error** (e.g., invalid prompt, corrupt image or video, no face found in an avatar image, expired input): the worker writes `clips/{sub}/{job_id}.failed` with a JSON reason (`{"code": "invalid_input", "field", "message"}`) and deletes the message (fast path).
 * **Unexpected error or hard crash:** the message is released or reappears and is retried. After 8 receives it moves to the DLQ and the failure-marker Lambda writes the `.failed` marker (section 3D).
 
