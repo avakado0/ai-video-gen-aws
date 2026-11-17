@@ -42,7 +42,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 ## Phase 2: Application code (TDD, in parallel with phase 1)
 
 - [ ] C. Write `model_manifest.json` for v1: prompt required, no slots, `seed`, `duration_seconds` (3 or 5), `negative_prompt` (max 200). Gate: manifest validator test.
-- [ ] C. API (FastAPI + Mangum, OOP, modular): `GET /config`, `POST /uploads`, `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `DELETE /jobs/{id}`. Tests assert the pre-signed POST policy conditions (moto does not enforce `content-length-range`), the 3-active-job cap, UUID validation, `sub` from claims only, and a no-claims request rejected.
+- [ ] C. API (FastAPI + Mangum, OOP, modular). Tests pin the 3-active-job cap as spec 3B states it: only `.pending` markers with no `.mp4` and no `.failed` count, so ready-but-undownloaded and failed jobs never block a user: `GET /config`, `POST /uploads`, `POST /jobs`, `GET /jobs`, `GET /jobs/{id}`, `DELETE /jobs/{id}`. Tests assert the pre-signed POST policy conditions (moto does not enforce `content-length-range`), the 3-active-job cap, UUID validation, `sub` from claims only, and a no-claims request rejected.
 - [ ] C. Worker: poll, skip a job whose `.pending` marker is gone (delete the message, no GPU work), heartbeat, release on SIGTERM and Spot notice, `.failed` fast path, delete message after upload, usage log line per attempt. Tests with fake SQS/S3, no GPU.
 - [ ] C. Front end: show elapsed time and the "up to 20 minutes after idle" note on pending jobs (`frontend/js/jobs.js`). Tests in mock mode.
 - [ ] C. CI: GitHub Actions running pytest, `terraform fmt -check`, `terraform validate`, no AWS credentials.
