@@ -122,6 +122,21 @@ data "aws_iam_policy_document" "task" {
     actions   = ["s3:PutObject"]
     resources = ["${aws_s3_bucket.clips.arn}/clips/*"]
   }
+  # Stale-job check (spec 4): HEAD the .pending marker before GPU work.
+  # ListBucket (below) makes a missing key a 404, not a 403. The worker treats
+  # only 404 as "job gone"; a 403 is an error and the job is retried.
+  statement {
+    sid       = "HeadPendingMarkers"
+    actions   = ["s3:GetObject"]
+    resources = ["${aws_s3_bucket.clips.arn}/clips/*.pending"]
+  }
+  # Unconditional, like the API role: a HEAD carries no s3:prefix, so a
+  # prefix condition would never match and the 404 would stay a 403.
+  statement {
+    sid       = "ListClipsBucket"
+    actions   = ["s3:ListBucket"]
+    resources = [aws_s3_bucket.clips.arn]
+  }
   statement {
     sid       = "ReadAndDeleteInputs"
     actions   = ["s3:GetObject", "s3:DeleteObject"]

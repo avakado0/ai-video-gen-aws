@@ -4,7 +4,7 @@ resource "aws_sqs_queue" "dlq" {
   name = "aivideogen-jobs-dlq"
 
   # Dead-lettered messages keep their original enqueue time, so retention must
-  # be at least the source queue's 4 days. 14 days is the maximum and is free.
+  # be at least the source queue's. 14 days is the maximum and is free.
   message_retention_seconds = 14 * 24 * 3600
   sqs_managed_sse_enabled   = true
 
@@ -16,8 +16,8 @@ resource "aws_sqs_queue" "dlq" {
 resource "aws_sqs_queue" "jobs" {
   name = "aivideogen-jobs"
 
-  message_retention_seconds  = 4 * 24 * 3600
-  visibility_timeout_seconds = 180 # 3 minutes; the worker heartbeat extends it
+  message_retention_seconds  = 24 * 3600 # 1 day, the .pending marker's lifetime (spec 3D)
+  visibility_timeout_seconds = 180       # 3 minutes; the worker heartbeat extends it
   sqs_managed_sse_enabled    = true
 
   # Every receive counts, including retries after a Spot release, so eight in a
