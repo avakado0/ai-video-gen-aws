@@ -52,6 +52,11 @@ resource "aws_ecs_task_definition" "worker" {
         { name = "QUEUE_URL", value = aws_sqs_queue.jobs.url },
         { name = "CLIPS_BUCKET", value = aws_s3_bucket.clips.bucket },
         { name = "MODELS_DIR", value = "/data/models" },
+        # boto3 needs a region and a bridge-mode container has none by default.
+        { name = "AWS_DEFAULT_REGION", value = var.region },
+        # One source of truth for the model's inputs and params (spec 3B); the worker re-checks
+        # every job against it. Re-encoded to one line, same as the API Lambda gets it.
+        { name = "MODEL_MANIFEST", value = jsonencode(jsondecode(file("${path.module}/../model_manifest.json"))) },
       ]
 
       logConfiguration = {
