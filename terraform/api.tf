@@ -1,13 +1,13 @@
 # API (spec 3B): HTTP API with a Cognito JWT authorizer in front of one Lambda
-# that will run the whole FastAPI app through Mangum. The Lambda has no function
-# URL; API Gateway is the only way in. Source: lambdas/api/ (placeholder until
-# the app is written).
+# that runs the whole FastAPI app through Mangum. The Lambda has no function
+# URL; API Gateway is the only way in. Source: lambdas/api/.
 
+# The zip holds the app plus its dependencies, which archive_file cannot install.
+# Run ./scripts/build_api.sh first; it fills build/api/ (git-ignored).
 data "archive_file" "api" {
   type        = "zip"
-  source_dir  = "${path.module}/../lambdas/api"
+  source_dir  = "${path.module}/../build/api"
   output_path = "${path.module}/.build/api.zip"
-  excludes    = ["__init__.py", "__pycache__"]
 }
 
 resource "aws_cloudwatch_log_group" "api" {
@@ -19,7 +19,7 @@ resource "aws_lambda_function" "api" {
   function_name = "aivideogen-api"
   role          = aws_iam_role.api.arn
   runtime       = "python3.12"
-  handler       = "handler.lambda_handler"
+  handler       = "api.handler.lambda_handler"
   timeout       = 29 # API Gateway gives up at 30 s
   memory_size   = 512
 
@@ -31,6 +31,9 @@ resource "aws_lambda_function" "api" {
       CLIPS_BUCKET    = aws_s3_bucket.clips.bucket
       QUEUE_URL       = aws_sqs_queue.jobs.url
       MAX_ACTIVE_JOBS = "3"
+      # One source of truth for the model's inputs and params (spec 3B). Re-encoded
+      # to one line; the app validates it on every cold start.
+      MODEL_MANIFEST = jsonencode(jsondecode(file("${path.module}/../model_manifest.json")))
     }
   }
 
