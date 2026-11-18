@@ -21,6 +21,7 @@ export class JobList {
   stop() { clearTimeout(this.timer); }
 
   async refresh() {
+    clearTimeout(this.timer); // a click-triggered refresh must not leave a second poll running
     let jobs;
     try { jobs = await this.api.listJobs(); } catch (e) { this.#renderError(e); return; }
     await this.#render(jobs);
@@ -66,11 +67,17 @@ export class JobList {
       if (r.field) why.textContent = `${r.field}: ${why.textContent}`;
       li.append(why);
     }
-    if (job.status !== 'pending') {
-      const del = Object.assign(document.createElement('button'), { type: 'button', textContent: 'Remove' });
-      del.addEventListener('click', async () => { await this.api.deleteJob(job.id); this.refresh(); });
-      li.append(del);
-    }
+    // A pending job can be cancelled: the same DELETE removes its marker, and the worker skips
+    // a job whose marker is gone. Ready and failed jobs are removed the same way.
+    const del = Object.assign(document.createElement('button'), {
+      type: 'button', textContent: job.status === 'pending' ? 'Cancel' : 'Remove',
+    });
+    del.addEventListener('click', async () => {
+      del.disabled = true; // one click, one request
+      try { await this.api.deleteJob(job.id); } catch (e) { if (e.status !== 404) console.error(e); } // 404: already gone
+      this.refresh();
+    });
+    li.append(del);
     return li;
   }
 
