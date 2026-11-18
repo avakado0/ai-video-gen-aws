@@ -85,3 +85,8 @@ output "budget_alert_topic_arn" {
   description = "Attach this to the budget's 100% alert in the console."
   value       = aws_sns_topic.budget.arn
 }
+
+output "cloudfront_distribution_id" {
+  description = "For clearing the CDN cache after a front-end change (README, Deploying)."
+  value       = aws_cloudfront_distribution.web.id
+}
