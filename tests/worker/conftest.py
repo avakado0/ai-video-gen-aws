@@ -18,3 +18,36 @@ def aws(monkeypatch):
         sqs = boto3.client("sqs", region_name=REGION)
         url = sqs.create_queue(QueueName="jobs", Attributes={"VisibilityTimeout": "180"})["QueueUrl"]
         yield type("AWS", (), {"s3": s3, "sqs": sqs, "bucket": BUCKET, "queue_url": url})
+
+
+@pytest.fixture
+def http():
+    """A tiny local HTTP server standing in for IMDS and the ECS metadata endpoint.
+
+    `server.routes[(method, path)] = (status, body)`; `server.seen` records (method, path, headers).
+    """
+    import threading
+    from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+
+    class Handler(BaseHTTPRequestHandler):
+        def _answer(self):
+            self.server.seen.append((self.command, self.path, dict(self.headers)))
+            status, body = self.server.routes.get((self.command, self.path), (404, ""))
+            if callable(body):
+                status, body = body()
+            self.send_response(status)
+            self.end_headers()
+            self.wfile.write(body.encode())
+
+        do_GET = do_PUT = _answer
+
+        def log_message(self, *a):
+            pass
+
+    server = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+    server.routes, server.seen = {}, []
+    server.url = f"http://127.0.0.1:{server.server_port}"
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    yield server
+    server.shutdown()
+    server.server_close()
