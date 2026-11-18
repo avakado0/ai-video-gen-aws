@@ -73,6 +73,21 @@ frontend/                              Static web app (vanilla JS, mock mode)
 - Request a Spot service-quota increase for "All G and VT Spot Instance Requests" in `us-west-2`. New accounts often have 0.
 - Choose the model and confirm it fits the instance-store size cap.
 
+## Deploying
+
+From `terraform/`, with `export AWS_PROFILE=terraform-deployer` (check `aws sts get-caller-identity` shows the right account):
+
+```bash
+terraform plan -out=tfplan
+terraform apply tfplan
+```
+
+After a front-end change, clear the CloudFront cache, or browsers can get the old files for a while (two cache layers, not just the 5-minute TTL). Up to 1,000 paths a month are free:
+
+```bash
+aws cloudfront create-invalidation --distribution-id "$(terraform output -raw cloudfront_distribution_id)" --paths "/*"
+```
+
 ## License
 
 MIT. See [LICENSE](LICENSE). Reuse is allowed, including commercially, as long as the copyright notice is kept.
