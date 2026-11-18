@@ -3,6 +3,7 @@ import { RealApiClient } from './api/RealApiClient.js';
 import { MockApiClient } from './api/MockApiClient.js';
 import { ManifestForm } from './form.js';
 import { JobList } from './jobs.js';
+import { confirmJob } from './confirm.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -47,6 +48,7 @@ async function main() {
     ev.preventDefault();
     const submit = $('submit');
     if (!(await form.validate())) return;
+    if (!(await confirmJob($('confirm'), manifest, form.values()))) return;
     submit.disabled = true;
     const status = $('submit-status');
     try {

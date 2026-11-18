@@ -38,3 +38,11 @@ button:disabled { opacity: .5; cursor: default; }
 .previews video { max-width: 100%; max-height: 14rem; border-radius: 6px; display: block; }
 .previews audio { width: 100%; min-width: 16rem; display: block; }
 .previews figcaption { font-size: .8rem; color: var(--muted); overflow-wrap: anywhere; }
+dialog { max-width: 28rem; width: calc(100% - 2rem); padding: 1.25rem; border: 1px solid var(--line); border-radius: 10px; color: var(--fg); background: var(--bg); }
+dialog::backdrop { background: rgba(0, 0, 0, .55); }
+dialog h2 { margin-top: 0; }
+dialog dl { margin: 0 0 1rem; display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; }
+dialog dt { font-weight: 600; text-transform: capitalize; }
+dialog dd { margin: 0; overflow-wrap: anywhere; }
+.actions { display: flex; gap: .75rem; justify-content: flex-end; margin-top: 1rem; }
+button.secondary { background: transparent; color: var(--accent); }

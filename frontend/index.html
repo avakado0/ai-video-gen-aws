@@ -37,6 +37,18 @@
     </section>
   </main>
 
+  <dialog id="confirm" aria-labelledby="confirm-title">
+    <form method="dialog">
+      <h2 id="confirm-title">Generate this video?</h2>
+      <dl></dl>
+      <p class="muted">A clip takes several minutes, and the first one after a quiet period can take up to 20. You can cancel it from the list while it waits.</p>
+      <div class="actions">
+        <button type="submit" value="cancel" class="secondary">Edit</button>
+        <button type="submit" value="ok" id="confirm-ok">Generate</button>
+      </div>
+    </form>
+  </dialog>
+
   <script type="module" src="js/app.js"></script>
 </body>
 </html>
