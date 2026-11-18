@@ -260,3 +260,18 @@ def test_if_queueing_fails_the_marker_is_removed(call, aws, put_input):
     assert res.status == 503
     keys = [o["Key"] for o in aws.s3.list_objects_v2(Bucket=BUCKET, Prefix="clips/").get("Contents", [])]
     assert keys == []  # no orphan marker eating the user's cap
+
+
+# --- undo window --------------------------------------------------------------
+
+def test_the_queue_message_is_delayed_so_a_quick_cancel_costs_nothing(call, aws, put_input, monkeypatch):
+    from api import handler
+    monkeypatch.setenv("SUBMIT_DELAY_SECONDS", "30")
+    handler.reset()
+    put_input()
+
+    assert submit(call).status == 201
+
+    assert queued(aws) == []  # not visible yet: no worker can start the job inside the window
+    attrs = aws.sqs.get_queue_attributes(QueueUrl=aws.queue_url, AttributeNames=["ApproximateNumberOfMessagesDelayed"])
+    assert attrs["Attributes"]["ApproximateNumberOfMessagesDelayed"] == "1"

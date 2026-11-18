@@ -55,6 +55,7 @@ def aws(monkeypatch):
         monkeypatch.setenv("CLIPS_BUCKET", BUCKET)
         monkeypatch.setenv("QUEUE_URL", queue_url)
         monkeypatch.setenv("MAX_ACTIVE_JOBS", "3")
+        monkeypatch.setenv("SUBMIT_DELAY_SECONDS", "0")  # tests read the queue at once; one test sets 30
         monkeypatch.setenv("MODEL_MANIFEST", (ROOT / "model_manifest.json").read_text())
         handler.reset()
         yield types.SimpleNamespace(s3=s3, sqs=sqs, bucket=BUCKET, queue_url=queue_url)

@@ -10,11 +10,12 @@ log = logging.getLogger(__name__)
 
 
 class JobService:
-    def __init__(self, store, queue, manifest, max_active_jobs):
+    def __init__(self, store, queue, manifest, max_active_jobs, submit_delay_seconds=0):
         self.store = store
         self.queue = queue
         self.manifest = manifest
         self.max_active_jobs = max_active_jobs
+        self.submit_delay_seconds = submit_delay_seconds
 
     def create_upload(self, sub, slot, index, mime, size, job_id=None):
         """Pre-signed POST for one input file. The first upload of a job mints its id."""
@@ -52,7 +53,7 @@ class JobService:
                                          "params": params, "inputs": counts})
         try:
             self.queue.send({"job_id": job_id, "sub": sub, "prompt": prompt, "params": params,
-                             "inputs": counts, "created": created})
+                             "inputs": counts, "created": created}, self.submit_delay_seconds)
         except Exception:
             log.exception("could not queue job %s", job_id)
             self.store.delete([marker_key])  # an orphan marker would count against the user's cap

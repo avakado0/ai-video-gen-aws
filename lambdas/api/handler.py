@@ -30,7 +30,7 @@ def _build():
     # non-default region must point at the regional endpoint, or browsers get redirected.
     s3 = boto3.client("s3", config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}))
     service = JobService(JobStore(s3, settings.clips_bucket), JobQueue(boto3.client("sqs"), settings.queue_url),
-                         settings.manifest, settings.max_active_jobs)
+                         settings.manifest, settings.max_active_jobs, settings.submit_delay_seconds)
     return Mangum(create_app(settings.manifest, service), lifespan="off")
 
 

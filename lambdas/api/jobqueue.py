@@ -7,5 +7,5 @@ class JobQueue:
         self.sqs = sqs
         self.url = url
 
-    def send(self, message):
-        self.sqs.send_message(QueueUrl=self.url, MessageBody=json.dumps(message))
+    def send(self, message, delay_seconds=0):
+        self.sqs.send_message(QueueUrl=self.url, MessageBody=json.dumps(message), DelaySeconds=delay_seconds)
