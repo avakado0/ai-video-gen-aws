@@ -56,8 +56,10 @@ docs/
   huggingFace_to_s3_instructions.md    Runbook: copy model weights from Hugging Face to S3
 System_Diagrams/                       draw.io diagrams (FINAL is current)
 terraform/                             The AWS stack (deployed 2026-11-18)
-lambdas/                               API, failure-marker and budget cut-off Lambdas
+lambdas/                               API, failure-marker and budget cut-off Lambdas; common/ is shared with the worker
+worker/                                The GPU worker container (Dockerfile, pinned requirements, `python -m worker`)
 scripts/build_api.sh                   Builds the API Lambda bundle
+scripts/build_push.sh                  Builds the worker image and pushes it to ECR
 model_manifest.json                    What the model accepts; drives the form and the API checks
 frontend/                              Static web app (vanilla JS, mock mode)
 ```
