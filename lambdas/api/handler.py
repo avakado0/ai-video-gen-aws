@@ -8,6 +8,10 @@ import json
 
 
 def lambda_handler(event, context):
+    # CORS preflight (OPTIONS route, no authorizer): API Gateway adds the CORS
+    # headers from cors_configuration; the browser only needs a 2xx.
+    if event.get("requestContext", {}).get("http", {}).get("method") == "OPTIONS":
+        return {"statusCode": 204}
     return {
         "statusCode": 501,
         "headers": {"content-type": "application/json"},
