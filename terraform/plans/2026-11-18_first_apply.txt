@@ -1,0 +1,2724 @@
+data.archive_file.api: Reading...
+data.archive_file.budget_cutoff: Reading...
+data.archive_file.failure_marker: Reading...
+data.archive_file.api: Read complete after 0s [id=5d32af52cf958b8148e8504e1a198232488a1eff]
+data.archive_file.budget_cutoff: Read complete after 0s [id=c527b80a163b4305db2633ee85eb2dcc766bea5b]
+data.archive_file.failure_marker: Read complete after 0s [id=a4c972c3e3d3cbc91e630d48630fd0d48a4fd2e1]
+data.aws_s3_bucket.models: Reading...
+data.aws_iam_policy_document.trust_lambda: Reading...
+data.aws_ssm_parameter.ecs_gpu_ami: Reading...
+data.aws_iam_policy_document.trust_lambda: Read complete after 0s [id=2690255455]
+data.aws_iam_policy_document.trust_ec2: Reading...
+data.aws_partition.current: Reading...
+data.aws_caller_identity.current: Reading...
+data.aws_iam_policy_document.trust_ec2: Read complete after 0s [id=2851119427]
+data.aws_partition.current: Read complete after 0s [id=aws]
+data.aws_caller_identity.current: Read complete after 1s [id=477656043770]
+data.aws_iam_policy_document.trust_ecs_tasks: Reading...
+data.aws_iam_policy_document.budget: Reading...
+data.aws_iam_policy_document.trust_ecs_tasks: Read complete after 0s [id=1530459078]
+data.aws_iam_policy_document.budget: Read complete after 0s [id=2368652632]
+data.aws_ssm_parameter.ecs_gpu_ami: Read complete after 1s [id=/aws/service/ecs/optimized-ami/amazon-linux-2023/gpu/recommended/image_id]
+data.aws_s3_bucket.models: Read complete after 2s [id=aivideogen-models-477656043770]
+data.aws_iam_policy_document.instance_models: Reading...
+data.aws_iam_policy_document.instance_models: Read complete after 0s [id=3463519122]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+ <= read (data resources)
+
+Terraform will perform the following actions:
+
+  # data.aws_iam_policy_document.api will be read during apply
+  # (config refers to values not yet known)
+ <= data "aws_iam_policy_document" "api" {
+      + id            = (known after apply)
+      + json          = (known after apply)
+      + minified_json = (known after apply)
+
+      + statement {
+          + actions   = [
+              + "sqs:SendMessage",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "EnqueueJobs"
+        }
+      + statement {
+          + actions   = [
+              + "s3:DeleteObject",
+              + "s3:GetObject",
+              + "s3:PutObject",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "ClipObjects"
+        }
+      + statement {
+          + actions   = [
+              + "s3:ListBucket",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "ListClipsBucket"
+        }
+      + statement {
+          + actions   = [
+              + "logs:CreateLogStream",
+              + "logs:PutLogEvents",
+            ]
+          + resources = [
+              + "arn:aws:logs:us-west-2:477656043770:log-group:/aws/lambda/aivideogen-api:*",
+            ]
+          + sid       = "WriteLogs"
+        }
+    }
+
+  # data.aws_iam_policy_document.budget_topic will be read during apply
+  # (config refers to values not yet known)
+ <= data "aws_iam_policy_document" "budget_topic" {
+      + id            = (known after apply)
+      + json          = (known after apply)
+      + minified_json = (known after apply)
+
+      + statement {
+          + actions   = [
+              + "sns:Publish",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "AllowBudgetsToPublish"
+
+          + condition {
+              + test     = "ArnLike"
+              + values   = [
+                  + "arn:aws:budgets::477656043770:*",
+                ]
+              + variable = "aws:SourceArn"
+            }
+          + condition {
+              + test     = "StringEquals"
+              + values   = [
+                  + "477656043770",
+                ]
+              + variable = "aws:SourceAccount"
+            }
+
+          + principals {
+              + identifiers = [
+                  + "budgets.amazonaws.com",
+                ]
+              + type        = "Service"
+            }
+        }
+    }
+
+  # data.aws_iam_policy_document.failure will be read during apply
+  # (config refers to values not yet known)
+ <= data "aws_iam_policy_document" "failure" {
+      + id            = (known after apply)
+      + json          = (known after apply)
+      + minified_json = (known after apply)
+
+      + statement {
+          + actions   = [
+              + "sqs:DeleteMessage",
+              + "sqs:GetQueueAttributes",
+              + "sqs:ReceiveMessage",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "ConsumeDeadLetters"
+        }
+      + statement {
+          + actions   = [
+              + "s3:PutObject",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "WriteFailedMarkers"
+        }
+      + statement {
+          + actions   = [
+              + "logs:CreateLogStream",
+              + "logs:PutLogEvents",
+            ]
+          + resources = [
+              + "arn:aws:logs:us-west-2:477656043770:log-group:/aws/lambda/aivideogen-failure-marker:*",
+            ]
+          + sid       = "WriteLogs"
+        }
+    }
+
+  # data.aws_iam_policy_document.task will be read during apply
+  # (config refers to values not yet known)
+ <= data "aws_iam_policy_document" "task" {
+      + id            = (known after apply)
+      + json          = (known after apply)
+      + minified_json = (known after apply)
+
+      + statement {
+          + actions   = [
+              + "sqs:ChangeMessageVisibility",
+              + "sqs:DeleteMessage",
+              + "sqs:ReceiveMessage",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "ConsumeJobs"
+        }
+      + statement {
+          + actions   = [
+              + "s3:PutObject",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "WriteClips"
+        }
+      + statement {
+          + actions   = [
+              + "s3:GetObject",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "HeadPendingMarkers"
+        }
+      + statement {
+          + actions   = [
+              + "s3:ListBucket",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "ListClipsBucket"
+        }
+      + statement {
+          + actions   = [
+              + "s3:DeleteObject",
+              + "s3:GetObject",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "ReadAndDeleteInputs"
+        }
+      + statement {
+          + actions   = [
+              + "ecs:UpdateTaskProtection",
+            ]
+          + resources = [
+              + "arn:aws:ecs:us-west-2:477656043770:task/aivideogen/*",
+            ]
+          + sid       = "ProtectOwnTaskFromScaleIn"
+        }
+    }
+
+  # data.aws_iam_policy_document.web_bucket will be read during apply
+  # (config refers to values not yet known)
+ <= data "aws_iam_policy_document" "web_bucket" {
+      + id            = (known after apply)
+      + json          = (known after apply)
+      + minified_json = (known after apply)
+
+      + statement {
+          + actions   = [
+              + "s3:GetObject",
+            ]
+          + resources = [
+              + (known after apply),
+            ]
+          + sid       = "AllowCloudFrontRead"
+
+          + condition {
+              + test     = "StringEquals"
+              + values   = [
+                  + (known after apply),
+                ]
+              + variable = "AWS:SourceArn"
+            }
+
+          + principals {
+              + identifiers = [
+                  + "cloudfront.amazonaws.com",
+                ]
+              + type        = "Service"
+            }
+        }
+    }
+
+  # aws_apigatewayv2_api.main will be created
+  + resource "aws_apigatewayv2_api" "main" {
+      + api_endpoint                 = (known after apply)
+      + api_key_selection_expression = "$request.header.x-api-key"
+      + arn                          = (known after apply)
+      + execution_arn                = (known after apply)
+      + id                           = (known after apply)
+      + ip_address_type              = (known after apply)
+      + name                         = "aivideogen"
+      + protocol_type                = "HTTP"
+      + route_selection_expression   = "$request.method $request.path"
+      + tags_all                     = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+
+      + cors_configuration {
+          + allow_headers = [
+              + "authorization",
+              + "content-type",
+            ]
+          + allow_methods = [
+              + "DELETE",
+              + "GET",
+              + "OPTIONS",
+              + "POST",
+            ]
+          + allow_origins = (known after apply)
+          + max_age       = 3600
+        }
+    }
+
+  # aws_apigatewayv2_authorizer.cognito will be created
+  + resource "aws_apigatewayv2_authorizer" "cognito" {
+      + api_id                           = (known after apply)
+      + authorizer_result_ttl_in_seconds = (known after apply)
+      + authorizer_type                  = "JWT"
+      + id                               = (known after apply)
+      + identity_sources                 = [
+          + "$request.header.Authorization",
+        ]
+      + name                             = "cognito"
+
+      + jwt_configuration {
+          + audience = (known after apply)
+          + issuer   = (known after apply)
+        }
+    }
+
+  # aws_apigatewayv2_integration.api will be created
+  + resource "aws_apigatewayv2_integration" "api" {
+      + api_id                                    = (known after apply)
+      + connection_type                           = "INTERNET"
+      + id                                        = (known after apply)
+      + integration_response_selection_expression = (known after apply)
+      + integration_type                          = "AWS_PROXY"
+      + integration_uri                           = (known after apply)
+      + payload_format_version                    = "2.0"
+      + timeout_milliseconds                      = (known after apply)
+    }
+
+  # aws_apigatewayv2_route.all will be created
+  + resource "aws_apigatewayv2_route" "all" {
+      + api_id             = (known after apply)
+      + api_key_required   = false
+      + authorization_type = "JWT"
+      + authorizer_id      = (known after apply)
+      + id                 = (known after apply)
+      + route_key          = "ANY /{proxy+}"
+      + target             = (known after apply)
+    }
+
+  # aws_apigatewayv2_stage.default will be created
+  + resource "aws_apigatewayv2_stage" "default" {
+      + api_id        = (known after apply)
+      + arn           = (known after apply)
+      + auto_deploy   = true
+      + deployment_id = (known after apply)
+      + execution_arn = (known after apply)
+      + id            = (known after apply)
+      + invoke_url    = (known after apply)
+      + name          = "$default"
+      + tags_all      = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+
+      + default_route_settings {
+          + data_trace_enabled       = false
+          + detailed_metrics_enabled = false
+          + logging_level            = (known after apply)
+          + throttling_burst_limit   = 20
+          + throttling_rate_limit    = 10
+        }
+    }
+
+  # aws_appautoscaling_policy.track_jobs will be created
+  + resource "aws_appautoscaling_policy" "track_jobs" {
+      + alarm_arns         = (known after apply)
+      + arn                = (known after apply)
+      + id                 = (known after apply)
+      + name               = "aivideogen-jobs-per-instance"
+      + policy_type        = "TargetTrackingScaling"
+      + resource_id        = "service/aivideogen/aivideogen-worker"
+      + scalable_dimension = "ecs:service:DesiredCount"
+      + service_namespace  = "ecs"
+
+      + target_tracking_scaling_policy_configuration {
+          + disable_scale_in   = false
+          + scale_in_cooldown  = 300
+          + scale_out_cooldown = 60
+          + target_value       = 1
+
+          + customized_metric_specification {
+              + metrics {
+                  + id          = "inflight"
+                  + return_data = false
+                    # (2 unchanged attributes hidden)
+
+                  + metric_stat {
+                      + stat = "Average"
+                        # (1 unchanged attribute hidden)
+
+                      + metric {
+                          + metric_name = "ApproximateNumberOfMessagesNotVisible"
+                          + namespace   = "AWS/SQS"
+
+                          + dimensions {
+                              + name  = "QueueName"
+                              + value = "aivideogen-jobs"
+                            }
+                        }
+                    }
+                }
+              + metrics {
+                  + id          = "instances"
+                  + return_data = false
+                    # (2 unchanged attributes hidden)
+
+                  + metric_stat {
+                      + stat = "Average"
+                        # (1 unchanged attribute hidden)
+
+                      + metric {
+                          + metric_name = "GroupInServiceInstances"
+                          + namespace   = "AWS/AutoScaling"
+
+                          + dimensions {
+                              + name  = "AutoScalingGroupName"
+                              + value = "aivideogen-gpu"
+                            }
+                        }
+                    }
+                }
+              + metrics {
+                  + id          = "visible"
+                  + return_data = false
+                    # (2 unchanged attributes hidden)
+
+                  + metric_stat {
+                      + stat = "Average"
+                        # (1 unchanged attribute hidden)
+
+                      + metric {
+                          + metric_name = "ApproximateNumberOfMessagesVisible"
+                          + namespace   = "AWS/SQS"
+
+                          + dimensions {
+                              + name  = "QueueName"
+                              + value = "aivideogen-jobs"
+                            }
+                        }
+                    }
+                }
+              + metrics {
+                  + expression  = "(visible + inflight) / instances"
+                  + id          = "jobs_per_instance"
+                  + label       = "Jobs per GPU instance"
+                  + return_data = true
+                }
+            }
+        }
+    }
+
+  # aws_appautoscaling_policy.wake will be created
+  + resource "aws_appautoscaling_policy" "wake" {
+      + alarm_arns         = (known after apply)
+      + arn                = (known after apply)
+      + id                 = (known after apply)
+      + name               = "aivideogen-wake"
+      + policy_type        = "StepScaling"
+      + resource_id        = "service/aivideogen/aivideogen-worker"
+      + scalable_dimension = "ecs:service:DesiredCount"
+      + service_namespace  = "ecs"
+
+      + step_scaling_policy_configuration {
+          + adjustment_type         = "ExactCapacity"
+          + cooldown                = 60
+          + metric_aggregation_type = "Maximum"
+
+          + step_adjustment {
+              + metric_interval_lower_bound = "0"
+              + scaling_adjustment          = 1
+                # (1 unchanged attribute hidden)
+            }
+        }
+    }
+
+  # aws_appautoscaling_target.worker will be created
+  + resource "aws_appautoscaling_target" "worker" {
+      + arn                = (known after apply)
+      + id                 = (known after apply)
+      + max_capacity       = 2
+      + min_capacity       = 0
+      + resource_id        = "service/aivideogen/aivideogen-worker"
+      + role_arn           = (known after apply)
+      + scalable_dimension = "ecs:service:DesiredCount"
+      + service_namespace  = "ecs"
+      + tags_all           = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+
+      + suspended_state (known after apply)
+    }
+
+  # aws_autoscaling_group.gpu will be created
+  + resource "aws_autoscaling_group" "gpu" {
+      + arn                              = (known after apply)
+      + availability_zones               = (known after apply)
+      + default_cooldown                 = (known after apply)
+      + desired_capacity                 = (known after apply)
+      + enabled_metrics                  = [
+          + "GroupInServiceInstances",
+        ]
+      + force_delete                     = false
+      + force_delete_warm_pool           = false
+      + health_check_grace_period        = 300
+      + health_check_type                = (known after apply)
+      + id                               = (known after apply)
+      + ignore_failed_scaling_activities = false
+      + load_balancers                   = (known after apply)
+      + max_size                         = 0
+      + metrics_granularity              = "1Minute"
+      + min_size                         = 0
+      + name                             = "aivideogen-gpu"
+      + name_prefix                      = (known after apply)
+      + predicted_capacity               = (known after apply)
+      + protect_from_scale_in            = true
+      + service_linked_role_arn          = (known after apply)
+      + target_group_arns                = (known after apply)
+      + vpc_zone_identifier              = (known after apply)
+      + wait_for_capacity_timeout        = "10m"
+      + warm_pool_size                   = (known after apply)
+
+      + availability_zone_distribution (known after apply)
+
+      + capacity_reservation_specification (known after apply)
+
+      + launch_template (known after apply)
+
+      + mixed_instances_policy {
+          + instances_distribution {
+              + on_demand_allocation_strategy            = (known after apply)
+              + on_demand_base_capacity                  = 0
+              + on_demand_percentage_above_base_capacity = 0
+              + spot_allocation_strategy                 = "price-capacity-optimized"
+              + spot_instance_pools                      = 0
+            }
+          + launch_template {
+              + launch_template_specification {
+                  + launch_template_id   = (known after apply)
+                  + launch_template_name = (known after apply)
+                  + version              = (known after apply)
+                }
+              + override {
+                  + instance_type = "g4dn.2xlarge"
+                }
+              + override {
+                  + instance_type = "g5.2xlarge"
+                }
+            }
+        }
+
+      + tag {
+          + key                 = "AmazonECSManaged"
+          + propagate_at_launch = true
+          + value               = "true"
+        }
+
+      + traffic_source (known after apply)
+    }
+
+  # aws_cloudfront_cache_policy.web will be created
+  + resource "aws_cloudfront_cache_policy" "web" {
+      + arn         = (known after apply)
+      + default_ttl = 300
+      + etag        = (known after apply)
+      + id          = (known after apply)
+      + max_ttl     = 300
+      + min_ttl     = 0
+      + name        = "aivideogen-web-5min"
+
+      + parameters_in_cache_key_and_forwarded_to_origin {
+          + enable_accept_encoding_brotli = true
+          + enable_accept_encoding_gzip   = true
+
+          + cookies_config {
+              + cookie_behavior = "none"
+            }
+
+          + headers_config {
+              + header_behavior = "none"
+            }
+
+          + query_strings_config {
+              + query_string_behavior = "none"
+            }
+        }
+    }
+
+  # aws_cloudfront_distribution.web will be created
+  + resource "aws_cloudfront_distribution" "web" {
+      + arn                             = (known after apply)
+      + caller_reference                = (known after apply)
+      + comment                         = "AIVideoGen web app"
+      + continuous_deployment_policy_id = (known after apply)
+      + default_root_object             = "index.html"
+      + domain_name                     = (known after apply)
+      + enabled                         = true
+      + etag                            = (known after apply)
+      + hosted_zone_id                  = (known after apply)
+      + http_version                    = "http2and3"
+      + id                              = (known after apply)
+      + in_progress_validation_batches  = (known after apply)
+      + is_ipv6_enabled                 = false
+      + last_modified_time              = (known after apply)
+      + price_class                     = "PriceClass_100"
+      + retain_on_delete                = false
+      + staging                         = false
+      + status                          = (known after apply)
+      + tags_all                        = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + trusted_key_groups              = (known after apply)
+      + trusted_signers                 = (known after apply)
+      + wait_for_deployment             = true
+
+      + default_cache_behavior {
+          + allowed_methods        = [
+              + "GET",
+              + "HEAD",
+            ]
+          + cache_policy_id        = (known after apply)
+          + cached_methods         = [
+              + "GET",
+              + "HEAD",
+            ]
+          + compress               = true
+          + default_ttl            = (known after apply)
+          + max_ttl                = (known after apply)
+          + min_ttl                = 0
+          + target_origin_id       = "web"
+          + trusted_key_groups     = (known after apply)
+          + trusted_signers        = (known after apply)
+          + viewer_protocol_policy = "redirect-to-https"
+
+          + grpc_config (known after apply)
+        }
+
+      + origin {
+          + connection_attempts      = 3
+          + connection_timeout       = 10
+          + domain_name              = (known after apply)
+          + origin_access_control_id = (known after apply)
+          + origin_id                = "web"
+            # (1 unchanged attribute hidden)
+        }
+
+      + restrictions {
+          + geo_restriction {
+              + locations        = (known after apply)
+              + restriction_type = "none"
+            }
+        }
+
+      + viewer_certificate {
+          + cloudfront_default_certificate = true
+          + minimum_protocol_version       = "TLSv1"
+        }
+    }
+
+  # aws_cloudfront_origin_access_control.web will be created
+  + resource "aws_cloudfront_origin_access_control" "web" {
+      + arn                               = (known after apply)
+      + description                       = "Managed by Terraform"
+      + etag                              = (known after apply)
+      + id                                = (known after apply)
+      + name                              = "aivideogen-web"
+      + origin_access_control_origin_type = "s3"
+      + signing_behavior                  = "always"
+      + signing_protocol                  = "sigv4"
+    }
+
+  # aws_cloudwatch_log_group.api will be created
+  + resource "aws_cloudwatch_log_group" "api" {
+      + arn               = (known after apply)
+      + id                = (known after apply)
+      + log_group_class   = (known after apply)
+      + name              = "/aws/lambda/aivideogen-api"
+      + name_prefix       = (known after apply)
+      + retention_in_days = 90
+      + skip_destroy      = false
+      + tags_all          = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+    }
+
+  # aws_cloudwatch_log_group.budget_cutoff will be created
+  + resource "aws_cloudwatch_log_group" "budget_cutoff" {
+      + arn               = (known after apply)
+      + id                = (known after apply)
+      + log_group_class   = (known after apply)
+      + name              = "/aws/lambda/aivideogen-budget-cutoff"
+      + name_prefix       = (known after apply)
+      + retention_in_days = 90
+      + skip_destroy      = false
+      + tags_all          = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+    }
+
+  # aws_cloudwatch_log_group.failure_marker will be created
+  + resource "aws_cloudwatch_log_group" "failure_marker" {
+      + arn               = (known after apply)
+      + id                = (known after apply)
+      + log_group_class   = (known after apply)
+      + name              = "/aws/lambda/aivideogen-failure-marker"
+      + name_prefix       = (known after apply)
+      + retention_in_days = 90
+      + skip_destroy      = false
+      + tags_all          = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+    }
+
+  # aws_cloudwatch_log_group.worker will be created
+  + resource "aws_cloudwatch_log_group" "worker" {
+      + arn               = (known after apply)
+      + id                = (known after apply)
+      + log_group_class   = (known after apply)
+      + name              = "/aivideogen/worker"
+      + name_prefix       = (known after apply)
+      + retention_in_days = 90
+      + skip_destroy      = false
+      + tags_all          = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+    }
+
+  # aws_cloudwatch_metric_alarm.dlq_not_empty will be created
+  + resource "aws_cloudwatch_metric_alarm" "dlq_not_empty" {
+      + actions_enabled                       = true
+      + alarm_actions                         = (known after apply)
+      + alarm_description                     = "A job was dead-lettered (failed 8 times)."
+      + alarm_name                            = "aivideogen-dlq-received"
+      + arn                                   = (known after apply)
+      + comparison_operator                   = "GreaterThanOrEqualToThreshold"
+      + dimensions                            = {
+          + "QueueName" = "aivideogen-jobs-dlq"
+        }
+      + evaluate_low_sample_count_percentiles = (known after apply)
+      + evaluation_periods                    = 1
+      + id                                    = (known after apply)
+      + metric_name                           = "NumberOfMessagesReceived"
+      + namespace                             = "AWS/SQS"
+      + period                                = 60
+      + statistic                             = "Sum"
+      + tags_all                              = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + threshold                             = 1
+      + treat_missing_data                    = "notBreaching"
+    }
+
+  # aws_cloudwatch_metric_alarm.jobs_waiting will be created
+  + resource "aws_cloudwatch_metric_alarm" "jobs_waiting" {
+      + actions_enabled                       = true
+      + alarm_actions                         = (known after apply)
+      + alarm_description                     = "A job is waiting in the queue: wake the worker service."
+      + alarm_name                            = "aivideogen-jobs-waiting"
+      + arn                                   = (known after apply)
+      + comparison_operator                   = "GreaterThanOrEqualToThreshold"
+      + dimensions                            = {
+          + "QueueName" = "aivideogen-jobs"
+        }
+      + evaluate_low_sample_count_percentiles = (known after apply)
+      + evaluation_periods                    = 1
+      + id                                    = (known after apply)
+      + metric_name                           = "ApproximateNumberOfMessagesVisible"
+      + namespace                             = "AWS/SQS"
+      + period                                = 60
+      + statistic                             = "Maximum"
+      + tags_all                              = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + threshold                             = 1
+      + treat_missing_data                    = "notBreaching"
+    }
+
+  # aws_cloudwatch_query_definition.usage_per_user will be created
+  + resource "aws_cloudwatch_query_definition" "usage_per_user" {
+      + id                  = (known after apply)
+      + log_group_names     = [
+          + "/aivideogen/worker",
+          + "/aws/lambda/aivideogen-api",
+        ]
+      + name                = "aivideogen/usage-per-user"
+      + query_definition_id = (known after apply)
+      + query_string        = <<-EOT
+            fields @timestamp
+            | filter event in ["job_attempt", "download", "inputs"]
+            | stats sum(gpu_seconds) as gpu_seconds, sum(bytes) as bytes, count(*) as events by sub, instance_type
+            | sort gpu_seconds desc
+        EOT
+    }
+
+  # aws_cognito_user_pool.main will be created
+  + resource "aws_cognito_user_pool" "main" {
+      + arn                        = (known after apply)
+      + auto_verified_attributes   = [
+          + "email",
+        ]
+      + creation_date              = (known after apply)
+      + custom_domain              = (known after apply)
+      + deletion_protection        = "INACTIVE"
+      + domain                     = (known after apply)
+      + email_verification_message = (known after apply)
+      + email_verification_subject = (known after apply)
+      + endpoint                   = (known after apply)
+      + estimated_number_of_users  = (known after apply)
+      + id                         = (known after apply)
+      + last_modified_date         = (known after apply)
+      + mfa_configuration          = "OFF"
+      + name                       = "aivideogen"
+      + sms_verification_message   = (known after apply)
+      + tags_all                   = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + user_pool_tier             = (known after apply)
+      + username_attributes        = [
+          + "email",
+        ]
+
+      + account_recovery_setting {
+          + recovery_mechanism {
+              + name     = "verified_email"
+              + priority = 1
+            }
+        }
+
+      + admin_create_user_config {
+          + allow_admin_create_user_only = true
+        }
+
+      + password_policy {
+          + minimum_length                   = 12
+          + require_lowercase                = true
+          + require_numbers                  = true
+          + require_symbols                  = false
+          + require_uppercase                = true
+          + temporary_password_validity_days = (known after apply)
+        }
+
+      + sign_in_policy (known after apply)
+
+      + sms_configuration (known after apply)
+
+      + username_configuration (known after apply)
+
+      + verification_message_template (known after apply)
+    }
+
+  # aws_cognito_user_pool_client.web will be created
+  + resource "aws_cognito_user_pool_client" "web" {
+      + access_token_validity                         = (known after apply)
+      + allowed_oauth_flows                           = [
+          + "code",
+        ]
+      + allowed_oauth_flows_user_pool_client          = true
+      + allowed_oauth_scopes                          = [
+          + "email",
+          + "openid",
+        ]
+      + auth_session_validity                         = (known after apply)
+      + callback_urls                                 = [
+          + (known after apply),
+        ]
+      + client_secret                                 = (sensitive value)
+      + default_redirect_uri                          = (known after apply)
+      + enable_propagate_additional_user_context_data = (known after apply)
+      + enable_token_revocation                       = true
+      + explicit_auth_flows                           = [
+          + "ALLOW_REFRESH_TOKEN_AUTH",
+        ]
+      + generate_secret                               = false
+      + id                                            = (known after apply)
+      + id_token_validity                             = (known after apply)
+      + logout_urls                                   = [
+          + (known after apply),
+        ]
+      + name                                          = "aivideogen-web"
+      + prevent_user_existence_errors                 = "ENABLED"
+      + read_attributes                               = (known after apply)
+      + refresh_token_validity                        = (known after apply)
+      + supported_identity_providers                  = [
+          + "COGNITO",
+        ]
+      + user_pool_id                                  = (known after apply)
+      + write_attributes                              = (known after apply)
+    }
+
+  # aws_cognito_user_pool_domain.main will be created
+  + resource "aws_cognito_user_pool_domain" "main" {
+      + aws_account_id                  = (known after apply)
+      + cloudfront_distribution         = (known after apply)
+      + cloudfront_distribution_arn     = (known after apply)
+      + cloudfront_distribution_zone_id = (known after apply)
+      + domain                          = "aivideogen-477656043770"
+      + id                              = (known after apply)
+      + managed_login_version           = (known after apply)
+      + s3_bucket                       = (known after apply)
+      + user_pool_id                    = (known after apply)
+      + version                         = (known after apply)
+    }
+
+  # aws_ecr_lifecycle_policy.worker will be created
+  + resource "aws_ecr_lifecycle_policy" "worker" {
+      + id          = (known after apply)
+      + policy      = jsonencode(
+            {
+              + rules = [
+                  + {
+                      + action       = {
+                          + type = "expire"
+                        }
+                      + description  = "Expire untagged images after 1 day"
+                      + rulePriority = 1
+                      + selection    = {
+                          + countNumber = 1
+                          + countType   = "sinceImagePushed"
+                          + countUnit   = "days"
+                          + tagStatus   = "untagged"
+                        }
+                    },
+                  + {
+                      + action       = {
+                          + type = "expire"
+                        }
+                      + description  = "Keep the latest 3 images"
+                      + rulePriority = 2
+                      + selection    = {
+                          + countNumber = 3
+                          + countType   = "imageCountMoreThan"
+                          + tagStatus   = "any"
+                        }
+                    },
+                ]
+            }
+        )
+      + registry_id = (known after apply)
+      + repository  = "aivideogen-worker"
+    }
+
+  # aws_ecr_repository.worker will be created
+  + resource "aws_ecr_repository" "worker" {
+      + arn                  = (known after apply)
+      + force_delete         = false
+      + id                   = (known after apply)
+      + image_tag_mutability = "MUTABLE"
+      + name                 = "aivideogen-worker"
+      + registry_id          = (known after apply)
+      + repository_url       = (known after apply)
+      + tags_all             = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+
+      + encryption_configuration {
+          + encryption_type = "AES256"
+          + kms_key         = (known after apply)
+        }
+
+      + image_scanning_configuration {
+          + scan_on_push = true
+        }
+    }
+
+  # aws_ecs_capacity_provider.gpu will be created
+  + resource "aws_ecs_capacity_provider" "gpu" {
+      + arn      = (known after apply)
+      + id       = (known after apply)
+      + name     = "aivideogen-gpu"
+      + tags_all = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+
+      + auto_scaling_group_provider {
+          + auto_scaling_group_arn         = (known after apply)
+          + managed_draining               = (known after apply)
+          + managed_termination_protection = "ENABLED"
+
+          + managed_scaling {
+              + instance_warmup_period    = (known after apply)
+              + maximum_scaling_step_size = 2
+              + minimum_scaling_step_size = 1
+              + status                    = "ENABLED"
+              + target_capacity           = 100
+            }
+        }
+    }
+
+  # aws_ecs_cluster.main will be created
+  + resource "aws_ecs_cluster" "main" {
+      + arn      = (known after apply)
+      + id       = (known after apply)
+      + name     = "aivideogen"
+      + tags_all = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+
+      + setting (known after apply)
+    }
+
+  # aws_ecs_cluster_capacity_providers.main will be created
+  + resource "aws_ecs_cluster_capacity_providers" "main" {
+      + capacity_providers = [
+          + "aivideogen-gpu",
+        ]
+      + cluster_name       = "aivideogen"
+      + id                 = (known after apply)
+
+      + default_capacity_provider_strategy {
+          + base              = 0
+          + capacity_provider = "aivideogen-gpu"
+          + weight            = 1
+        }
+    }
+
+  # aws_ecs_service.worker will be created
+  + resource "aws_ecs_service" "worker" {
+      + availability_zone_rebalancing      = "DISABLED"
+      + cluster                            = (known after apply)
+      + deployment_maximum_percent         = 100
+      + deployment_minimum_healthy_percent = 0
+      + desired_count                      = 0
+      + enable_ecs_managed_tags            = false
+      + enable_execute_command             = false
+      + iam_role                           = (known after apply)
+      + id                                 = (known after apply)
+      + launch_type                        = (known after apply)
+      + name                               = "aivideogen-worker"
+      + platform_version                   = (known after apply)
+      + scheduling_strategy                = "REPLICA"
+      + tags_all                           = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + task_definition                    = (known after apply)
+      + triggers                           = (known after apply)
+      + wait_for_steady_state              = false
+
+      + capacity_provider_strategy {
+          + capacity_provider = "aivideogen-gpu"
+          + weight            = 1
+        }
+    }
+
+  # aws_ecs_task_definition.worker will be created
+  + resource "aws_ecs_task_definition" "worker" {
+      + arn                      = (known after apply)
+      + arn_without_revision     = (known after apply)
+      + container_definitions    = (known after apply)
+      + enable_fault_injection   = (known after apply)
+      + execution_role_arn       = (known after apply)
+      + family                   = "aivideogen-worker"
+      + id                       = (known after apply)
+      + network_mode             = "bridge"
+      + requires_compatibilities = [
+          + "EC2",
+        ]
+      + revision                 = (known after apply)
+      + skip_destroy             = false
+      + tags_all                 = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + task_role_arn            = (known after apply)
+      + track_latest             = false
+
+      + volume {
+          + configure_at_launch = (known after apply)
+          + host_path           = "/data"
+          + name                = "data"
+        }
+    }
+
+  # aws_iam_instance_profile.instance will be created
+  + resource "aws_iam_instance_profile" "instance" {
+      + arn         = (known after apply)
+      + create_date = (known after apply)
+      + id          = (known after apply)
+      + name        = "aivideogen-instance"
+      + name_prefix = (known after apply)
+      + path        = "/"
+      + role        = "aivideogen-instance"
+      + tags_all    = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + unique_id   = (known after apply)
+    }
+
+  # aws_iam_role.api will be created
+  + resource "aws_iam_role" "api" {
+      + arn                   = (known after apply)
+      + assume_role_policy    = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "sts:AssumeRole"
+                      + Effect    = "Allow"
+                      + Principal = {
+                          + Service = "lambda.amazonaws.com"
+                        }
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + create_date           = (known after apply)
+      + force_detach_policies = false
+      + id                    = (known after apply)
+      + managed_policy_arns   = (known after apply)
+      + max_session_duration  = 3600
+      + name                  = "aivideogen-api"
+      + name_prefix           = (known after apply)
+      + path                  = "/"
+      + tags_all              = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + unique_id             = (known after apply)
+
+      + inline_policy (known after apply)
+    }
+
+  # aws_iam_role.budget will be created
+  + resource "aws_iam_role" "budget" {
+      + arn                   = (known after apply)
+      + assume_role_policy    = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "sts:AssumeRole"
+                      + Effect    = "Allow"
+                      + Principal = {
+                          + Service = "lambda.amazonaws.com"
+                        }
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + create_date           = (known after apply)
+      + force_detach_policies = false
+      + id                    = (known after apply)
+      + managed_policy_arns   = (known after apply)
+      + max_session_duration  = 3600
+      + name                  = "aivideogen-budget-cutoff"
+      + name_prefix           = (known after apply)
+      + path                  = "/"
+      + tags_all              = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + unique_id             = (known after apply)
+
+      + inline_policy (known after apply)
+    }
+
+  # aws_iam_role.failure will be created
+  + resource "aws_iam_role" "failure" {
+      + arn                   = (known after apply)
+      + assume_role_policy    = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "sts:AssumeRole"
+                      + Effect    = "Allow"
+                      + Principal = {
+                          + Service = "lambda.amazonaws.com"
+                        }
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + create_date           = (known after apply)
+      + force_detach_policies = false
+      + id                    = (known after apply)
+      + managed_policy_arns   = (known after apply)
+      + max_session_duration  = 3600
+      + name                  = "aivideogen-failure-marker"
+      + name_prefix           = (known after apply)
+      + path                  = "/"
+      + tags_all              = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + unique_id             = (known after apply)
+
+      + inline_policy (known after apply)
+    }
+
+  # aws_iam_role.instance will be created
+  + resource "aws_iam_role" "instance" {
+      + arn                   = (known after apply)
+      + assume_role_policy    = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "sts:AssumeRole"
+                      + Effect    = "Allow"
+                      + Principal = {
+                          + Service = "ec2.amazonaws.com"
+                        }
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + create_date           = (known after apply)
+      + force_detach_policies = false
+      + id                    = (known after apply)
+      + managed_policy_arns   = (known after apply)
+      + max_session_duration  = 3600
+      + name                  = "aivideogen-instance"
+      + name_prefix           = (known after apply)
+      + path                  = "/"
+      + tags_all              = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + unique_id             = (known after apply)
+
+      + inline_policy (known after apply)
+    }
+
+  # aws_iam_role.task will be created
+  + resource "aws_iam_role" "task" {
+      + arn                   = (known after apply)
+      + assume_role_policy    = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "sts:AssumeRole"
+                      + Condition = {
+                          + StringEquals = {
+                              + "aws:SourceAccount" = "477656043770"
+                            }
+                        }
+                      + Effect    = "Allow"
+                      + Principal = {
+                          + Service = "ecs-tasks.amazonaws.com"
+                        }
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + create_date           = (known after apply)
+      + force_detach_policies = false
+      + id                    = (known after apply)
+      + managed_policy_arns   = (known after apply)
+      + max_session_duration  = 3600
+      + name                  = "aivideogen-task"
+      + name_prefix           = (known after apply)
+      + path                  = "/"
+      + tags_all              = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + unique_id             = (known after apply)
+
+      + inline_policy (known after apply)
+    }
+
+  # aws_iam_role.task_execution will be created
+  + resource "aws_iam_role" "task_execution" {
+      + arn                   = (known after apply)
+      + assume_role_policy    = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action    = "sts:AssumeRole"
+                      + Condition = {
+                          + StringEquals = {
+                              + "aws:SourceAccount" = "477656043770"
+                            }
+                        }
+                      + Effect    = "Allow"
+                      + Principal = {
+                          + Service = "ecs-tasks.amazonaws.com"
+                        }
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + create_date           = (known after apply)
+      + force_detach_policies = false
+      + id                    = (known after apply)
+      + managed_policy_arns   = (known after apply)
+      + max_session_duration  = 3600
+      + name                  = "aivideogen-task-execution"
+      + name_prefix           = (known after apply)
+      + path                  = "/"
+      + tags_all              = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + unique_id             = (known after apply)
+
+      + inline_policy (known after apply)
+    }
+
+  # aws_iam_role_policy.api will be created
+  + resource "aws_iam_role_policy" "api" {
+      + id          = (known after apply)
+      + name        = "api"
+      + name_prefix = (known after apply)
+      + policy      = (known after apply)
+      + role        = (known after apply)
+    }
+
+  # aws_iam_role_policy.budget will be created
+  + resource "aws_iam_role_policy" "budget" {
+      + id          = (known after apply)
+      + name        = "budget-cutoff"
+      + name_prefix = (known after apply)
+      + policy      = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action   = "autoscaling:UpdateAutoScalingGroup"
+                      + Effect   = "Allow"
+                      + Resource = "arn:aws:autoscaling:us-west-2:477656043770:autoScalingGroup:*:autoScalingGroupName/aivideogen-gpu"
+                      + Sid      = "ZeroTheGpuGroup"
+                    },
+                  + {
+                      + Action   = [
+                          + "ecs:UpdateService",
+                          + "ecs:DescribeServices",
+                        ]
+                      + Effect   = "Allow"
+                      + Resource = "arn:aws:ecs:us-west-2:477656043770:service/aivideogen/aivideogen-worker"
+                      + Sid      = "ZeroTheWorkerService"
+                    },
+                  + {
+                      + Action   = [
+                          + "application-autoscaling:RegisterScalableTarget",
+                          + "application-autoscaling:DescribeScalableTargets",
+                        ]
+                      + Effect   = "Allow"
+                      + Resource = "*"
+                      + Sid      = "ZeroTheServiceAutoscaling"
+                    },
+                  + {
+                      + Action   = [
+                          + "logs:PutLogEvents",
+                          + "logs:CreateLogStream",
+                        ]
+                      + Effect   = "Allow"
+                      + Resource = "arn:aws:logs:us-west-2:477656043770:log-group:/aws/lambda/aivideogen-budget-cutoff:*"
+                      + Sid      = "WriteLogs"
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + role        = (known after apply)
+    }
+
+  # aws_iam_role_policy.failure will be created
+  + resource "aws_iam_role_policy" "failure" {
+      + id          = (known after apply)
+      + name        = "failure-marker"
+      + name_prefix = (known after apply)
+      + policy      = (known after apply)
+      + role        = (known after apply)
+    }
+
+  # aws_iam_role_policy.instance_models will be created
+  + resource "aws_iam_role_policy" "instance_models" {
+      + id          = (known after apply)
+      + name        = "read-models"
+      + name_prefix = (known after apply)
+      + policy      = jsonencode(
+            {
+              + Statement = [
+                  + {
+                      + Action   = "s3:GetObject"
+                      + Effect   = "Allow"
+                      + Resource = "arn:aws:s3:::aivideogen-models-477656043770/models/*"
+                      + Sid      = "ReadModelWeights"
+                    },
+                  + {
+                      + Action    = "s3:ListBucket"
+                      + Condition = {
+                          + StringLike = {
+                              + "s3:prefix" = "models/*"
+                            }
+                        }
+                      + Effect    = "Allow"
+                      + Resource  = "arn:aws:s3:::aivideogen-models-477656043770"
+                      + Sid       = "ListModelWeights"
+                    },
+                ]
+              + Version   = "2012-10-17"
+            }
+        )
+      + role        = (known after apply)
+    }
+
+  # aws_iam_role_policy.task will be created
+  + resource "aws_iam_role_policy" "task" {
+      + id          = (known after apply)
+      + name        = "worker"
+      + name_prefix = (known after apply)
+      + policy      = (known after apply)
+      + role        = (known after apply)
+    }
+
+  # aws_iam_role_policy_attachment.instance_ecs will be created
+  + resource "aws_iam_role_policy_attachment" "instance_ecs" {
+      + id         = (known after apply)
+      + policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonEC2ContainerServiceforEC2Role"
+      + role       = "aivideogen-instance"
+    }
+
+  # aws_iam_role_policy_attachment.task_execution will be created
+  + resource "aws_iam_role_policy_attachment" "task_execution" {
+      + id         = (known after apply)
+      + policy_arn = "arn:aws:iam::aws:policy/service-role/AmazonECSTaskExecutionRolePolicy"
+      + role       = "aivideogen-task-execution"
+    }
+
+  # aws_internet_gateway.main will be created
+  + resource "aws_internet_gateway" "main" {
+      + arn      = (known after apply)
+      + id       = (known after apply)
+      + owner_id = (known after apply)
+      + tags     = {
+          + "Name" = "aivideogen"
+        }
+      + tags_all = {
+          + "ManagedBy" = "Terraform"
+          + "Name"      = "aivideogen"
+          + "Project"   = "AIVideoGen"
+        }
+      + vpc_id   = (known after apply)
+    }
+
+  # aws_lambda_event_source_mapping.failure_marker will be created
+  + resource "aws_lambda_event_source_mapping" "failure_marker" {
+      + arn                           = (known after apply)
+      + batch_size                    = 10
+      + enabled                       = true
+      + event_source_arn              = (known after apply)
+      + function_arn                  = (known after apply)
+      + function_name                 = (known after apply)
+      + function_response_types       = [
+          + "ReportBatchItemFailures",
+        ]
+      + id                            = (known after apply)
+      + last_modified                 = (known after apply)
+      + last_processing_result        = (known after apply)
+      + maximum_record_age_in_seconds = (known after apply)
+      + maximum_retry_attempts        = (known after apply)
+      + parallelization_factor        = (known after apply)
+      + state                         = (known after apply)
+      + state_transition_reason       = (known after apply)
+      + tags_all                      = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + uuid                          = (known after apply)
+
+      + amazon_managed_kafka_event_source_config (known after apply)
+
+      + scaling_config {
+          + maximum_concurrency = 2
+        }
+
+      + self_managed_kafka_event_source_config (known after apply)
+    }
+
+  # aws_lambda_function.api will be created
+  + resource "aws_lambda_function" "api" {
+      + architectures                  = (known after apply)
+      + arn                            = (known after apply)
+      + code_sha256                    = (known after apply)
+      + filename                       = "./.build/api.zip"
+      + function_name                  = "aivideogen-api"
+      + handler                        = "handler.lambda_handler"
+      + id                             = (known after apply)
+      + invoke_arn                     = (known after apply)
+      + last_modified                  = (known after apply)
+      + memory_size                    = 512
+      + package_type                   = "Zip"
+      + publish                        = false
+      + qualified_arn                  = (known after apply)
+      + qualified_invoke_arn           = (known after apply)
+      + reserved_concurrent_executions = -1
+      + role                           = (known after apply)
+      + runtime                        = "python3.12"
+      + signing_job_arn                = (known after apply)
+      + signing_profile_version_arn    = (known after apply)
+      + skip_destroy                   = false
+      + source_code_hash               = "ggBAzoMZGvb6LDYQ8LZq+WXHYqyhxyYCp9vBO2E19L8="
+      + source_code_size               = (known after apply)
+      + tags_all                       = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + timeout                        = 29
+      + version                        = (known after apply)
+
+      + environment {
+          + variables = (known after apply)
+        }
+
+      + ephemeral_storage (known after apply)
+
+      + logging_config (known after apply)
+
+      + tracing_config (known after apply)
+    }
+
+  # aws_lambda_function.budget_cutoff will be created
+  + resource "aws_lambda_function" "budget_cutoff" {
+      + architectures                  = (known after apply)
+      + arn                            = (known after apply)
+      + code_sha256                    = (known after apply)
+      + filename                       = "./.build/budget_cutoff.zip"
+      + function_name                  = "aivideogen-budget-cutoff"
+      + handler                        = "handler.lambda_handler"
+      + id                             = (known after apply)
+      + invoke_arn                     = (known after apply)
+      + last_modified                  = (known after apply)
+      + memory_size                    = 128
+      + package_type                   = "Zip"
+      + publish                        = false
+      + qualified_arn                  = (known after apply)
+      + qualified_invoke_arn           = (known after apply)
+      + reserved_concurrent_executions = -1
+      + role                           = (known after apply)
+      + runtime                        = "python3.12"
+      + signing_job_arn                = (known after apply)
+      + signing_profile_version_arn    = (known after apply)
+      + skip_destroy                   = false
+      + source_code_hash               = "UUblVhA39AbfppnCedQGe8N3R4dVN833m0lbBA1avTA="
+      + source_code_size               = (known after apply)
+      + tags_all                       = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + timeout                        = 30
+      + version                        = (known after apply)
+
+      + environment {
+          + variables = {
+              + "ASG_NAME"    = "aivideogen-gpu"
+              + "ECS_CLUSTER" = "aivideogen"
+              + "ECS_SERVICE" = "aivideogen-worker"
+            }
+        }
+
+      + ephemeral_storage (known after apply)
+
+      + logging_config (known after apply)
+
+      + tracing_config (known after apply)
+    }
+
+  # aws_lambda_function.failure_marker will be created
+  + resource "aws_lambda_function" "failure_marker" {
+      + architectures                  = (known after apply)
+      + arn                            = (known after apply)
+      + code_sha256                    = (known after apply)
+      + filename                       = "./.build/failure_marker.zip"
+      + function_name                  = "aivideogen-failure-marker"
+      + handler                        = "handler.lambda_handler"
+      + id                             = (known after apply)
+      + invoke_arn                     = (known after apply)
+      + last_modified                  = (known after apply)
+      + memory_size                    = 128
+      + package_type                   = "Zip"
+      + publish                        = false
+      + qualified_arn                  = (known after apply)
+      + qualified_invoke_arn           = (known after apply)
+      + reserved_concurrent_executions = -1
+      + role                           = (known after apply)
+      + runtime                        = "python3.12"
+      + signing_job_arn                = (known after apply)
+      + signing_profile_version_arn    = (known after apply)
+      + skip_destroy                   = false
+      + source_code_hash               = "17aIsWNer29P9e7NxBWTJvy2aXtr/sgZqbVuDqcsorU="
+      + source_code_size               = (known after apply)
+      + tags_all                       = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + timeout                        = 10
+      + version                        = (known after apply)
+
+      + environment {
+          + variables = {
+              + "CLIPS_BUCKET" = "aivideogen-clips-477656043770"
+            }
+        }
+
+      + ephemeral_storage (known after apply)
+
+      + logging_config (known after apply)
+
+      + tracing_config (known after apply)
+    }
+
+  # aws_lambda_permission.api_gateway will be created
+  + resource "aws_lambda_permission" "api_gateway" {
+      + action              = "lambda:InvokeFunction"
+      + function_name       = "aivideogen-api"
+      + id                  = (known after apply)
+      + principal           = "apigateway.amazonaws.com"
+      + source_arn          = (known after apply)
+      + statement_id        = "AllowApiGatewayInvoke"
+      + statement_id_prefix = (known after apply)
+    }
+
+  # aws_lambda_permission.budget_from_sns will be created
+  + resource "aws_lambda_permission" "budget_from_sns" {
+      + action              = "lambda:InvokeFunction"
+      + function_name       = "aivideogen-budget-cutoff"
+      + id                  = (known after apply)
+      + principal           = "sns.amazonaws.com"
+      + source_arn          = (known after apply)
+      + statement_id        = "AllowSnsInvoke"
+      + statement_id_prefix = (known after apply)
+    }
+
+  # aws_launch_template.gpu will be created
+  + resource "aws_launch_template" "gpu" {
+      + arn             = (known after apply)
+      + default_version = (known after apply)
+      + id              = (known after apply)
+      + image_id        = (sensitive value)
+      + latest_version  = (known after apply)
+      + name            = (known after apply)
+      + name_prefix     = "aivideogen-gpu-"
+      + tags_all        = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + user_data       = "IyEvYmluL2Jhc2gKIyBSdW5zIG9uY2UgcGVyIGJvb3QsIGJlZm9yZSB0aGUgRUNTIGFnZW50IHJlZ2lzdGVycyAoc3BlYyAzRSkuCiMgMS4gRm9ybWF0IGFuZCBtb3VudCB0aGUgbG9jYWwgTlZNZSBpbnN0YW5jZSBzdG9yZSBhdCAvZGF0YSAod2lwZWQgb24gc3RvcCkuCiMgMi4gQ29weSB0aGUgbW9kZWwgd2VpZ2h0cyBmcm9tIFMzIChmcmVlIG92ZXIgdGhlIGdhdGV3YXkgZW5kcG9pbnQpLgojIDMuIE9ubHkgdGhlbiB3cml0ZSB0aGUgRUNTIGNvbmZpZy4gVW50aWwgL2V0Yy9lY3MvZWNzLmNvbmZpZyBuYW1lcyB0aGlzCiMgICAgY2x1c3RlciwgdGhlIGFnZW50IGpvaW5zICJkZWZhdWx0IiBhbmQgcmVjZWl2ZXMgbm8gdGFza3MsIHNvIGEgZmFpbGVkIGNvcHkKIyAgICBjYW4gbmV2ZXIgc3RhcnQgYSBqb2Igd2l0aG91dCB3ZWlnaHRzLgpzZXQgLWV1byBwaXBlZmFpbAoKREVWPSQobHMgL2Rldi9kaXNrL2J5LWlkL252bWUtQW1hem9uX0VDMl9OVk1lX0luc3RhbmNlX1N0b3JhZ2VfKiB8IGhlYWQgLW4gMSkKbWtmcy54ZnMgLWYgIiRERVYiCm1rZGlyIC1wIC9kYXRhCm1vdW50ICIkREVWIiAvZGF0YQoKbWtkaXIgLXAgL2RhdGEvbW9kZWxzCmF3cyBzMyBzeW5jICJzMzovL2FpdmlkZW9nZW4tbW9kZWxzLTQ3NzY1NjA0Mzc3MC9tb2RlbHMvIiAvZGF0YS9tb2RlbHMvIC0tcmVnaW9uICJ1cy13ZXN0LTIiIC0tb25seS1zaG93LWVycm9ycwoKY2F0ID4+IC9ldGMvZWNzL2Vjcy5jb25maWcgPDxDRkcKRUNTX0NMVVNURVI9YWl2aWRlb2dlbgpFQ1NfRU5BQkxFX1NQT1RfSU5TVEFOQ0VfRFJBSU5JTkc9dHJ1ZQpFQ1NfRU5BQkxFX0dQVV9TVVBQT1JUPXRydWUKQ0ZHCg=="
+
+      + block_device_mappings {
+          + device_name = "/dev/xvda"
+
+          + ebs {
+              + delete_on_termination      = "true"
+              + encrypted                  = "true"
+              + iops                       = (known after apply)
+              + throughput                 = (known after apply)
+              + volume_initialization_rate = (known after apply)
+              + volume_size                = 60
+              + volume_type                = "gp3"
+            }
+        }
+
+      + iam_instance_profile {
+          + arn = (known after apply)
+        }
+
+      + metadata_options {
+          + http_endpoint               = "enabled"
+          + http_protocol_ipv6          = (known after apply)
+          + http_put_response_hop_limit = 2
+          + http_tokens                 = "required"
+          + instance_metadata_tags      = (known after apply)
+        }
+
+      + network_interfaces {
+          + associate_public_ip_address = "true"
+          + security_groups             = (known after apply)
+        }
+    }
+
+  # aws_route.internet will be created
+  + resource "aws_route" "internet" {
+      + destination_cidr_block = "0.0.0.0/0"
+      + gateway_id             = (known after apply)
+      + id                     = (known after apply)
+      + instance_id            = (known after apply)
+      + instance_owner_id      = (known after apply)
+      + network_interface_id   = (known after apply)
+      + origin                 = (known after apply)
+      + route_table_id         = (known after apply)
+      + state                  = (known after apply)
+    }
+
+  # aws_route_table.public will be created
+  + resource "aws_route_table" "public" {
+      + arn              = (known after apply)
+      + id               = (known after apply)
+      + owner_id         = (known after apply)
+      + propagating_vgws = (known after apply)
+      + route            = (known after apply)
+      + tags             = {
+          + "Name" = "aivideogen-public"
+        }
+      + tags_all         = {
+          + "ManagedBy" = "Terraform"
+          + "Name"      = "aivideogen-public"
+          + "Project"   = "AIVideoGen"
+        }
+      + vpc_id           = (known after apply)
+    }
+
+  # aws_route_table_association.public["us-west-2a"] will be created
+  + resource "aws_route_table_association" "public" {
+      + id             = (known after apply)
+      + route_table_id = (known after apply)
+      + subnet_id      = (known after apply)
+    }
+
+  # aws_route_table_association.public["us-west-2b"] will be created
+  + resource "aws_route_table_association" "public" {
+      + id             = (known after apply)
+      + route_table_id = (known after apply)
+      + subnet_id      = (known after apply)
+    }
+
+  # aws_s3_bucket.clips will be created
+  + resource "aws_s3_bucket" "clips" {
+      + acceleration_status         = (known after apply)
+      + acl                         = (known after apply)
+      + arn                         = (known after apply)
+      + bucket                      = "aivideogen-clips-477656043770"
+      + bucket_domain_name          = (known after apply)
+      + bucket_prefix               = (known after apply)
+      + bucket_regional_domain_name = (known after apply)
+      + force_destroy               = true
+      + hosted_zone_id              = (known after apply)
+      + id                          = (known after apply)
+      + object_lock_enabled         = (known after apply)
+      + policy                      = (known after apply)
+      + region                      = (known after apply)
+      + request_payer               = (known after apply)
+      + tags_all                    = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + website_domain              = (known after apply)
+      + website_endpoint            = (known after apply)
+
+      + cors_rule (known after apply)
+
+      + grant (known after apply)
+
+      + lifecycle_rule (known after apply)
+
+      + logging (known after apply)
+
+      + object_lock_configuration (known after apply)
+
+      + replication_configuration (known after apply)
+
+      + server_side_encryption_configuration (known after apply)
+
+      + versioning (known after apply)
+
+      + website (known after apply)
+    }
+
+  # aws_s3_bucket.web will be created
+  + resource "aws_s3_bucket" "web" {
+      + acceleration_status         = (known after apply)
+      + acl                         = (known after apply)
+      + arn                         = (known after apply)
+      + bucket                      = "aivideogen-web-477656043770"
+      + bucket_domain_name          = (known after apply)
+      + bucket_prefix               = (known after apply)
+      + bucket_regional_domain_name = (known after apply)
+      + force_destroy               = true
+      + hosted_zone_id              = (known after apply)
+      + id                          = (known after apply)
+      + object_lock_enabled         = (known after apply)
+      + policy                      = (known after apply)
+      + region                      = (known after apply)
+      + request_payer               = (known after apply)
+      + tags_all                    = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + website_domain              = (known after apply)
+      + website_endpoint            = (known after apply)
+
+      + cors_rule (known after apply)
+
+      + grant (known after apply)
+
+      + lifecycle_rule (known after apply)
+
+      + logging (known after apply)
+
+      + object_lock_configuration (known after apply)
+
+      + replication_configuration (known after apply)
+
+      + server_side_encryption_configuration (known after apply)
+
+      + versioning (known after apply)
+
+      + website (known after apply)
+    }
+
+  # aws_s3_bucket_cors_configuration.clips will be created
+  + resource "aws_s3_bucket_cors_configuration" "clips" {
+      + bucket = (known after apply)
+      + id     = (known after apply)
+
+      + cors_rule {
+          + allowed_headers = [
+              + "*",
+            ]
+          + allowed_methods = [
+              + "GET",
+              + "HEAD",
+              + "POST",
+            ]
+          + allowed_origins = (known after apply)
+          + expose_headers  = [
+              + "ETag",
+            ]
+            id              = null
+          + max_age_seconds = 3000
+        }
+    }
+
+  # aws_s3_bucket_lifecycle_configuration.clips will be created
+  + resource "aws_s3_bucket_lifecycle_configuration" "clips" {
+      + bucket                                 = (known after apply)
+      + expected_bucket_owner                  = (known after apply)
+      + id                                     = (known after apply)
+      + transition_default_minimum_object_size = "all_storage_classes_128K"
+
+      + rule {
+          + id     = "expire-clips"
+          + status = "Enabled"
+            # (1 unchanged attribute hidden)
+
+          + expiration {
+              + days                         = 1
+              + expired_object_delete_marker = false
+            }
+
+          + filter {
+              + prefix = "clips/"
+            }
+        }
+      + rule {
+          + id     = "expire-inputs"
+          + status = "Enabled"
+            # (1 unchanged attribute hidden)
+
+          + abort_incomplete_multipart_upload {
+              + days_after_initiation = 1
+            }
+
+          + expiration {
+              + days                         = 1
+              + expired_object_delete_marker = false
+            }
+
+          + filter {
+              + prefix = "inputs/"
+            }
+        }
+    }
+
+  # aws_s3_bucket_policy.web will be created
+  + resource "aws_s3_bucket_policy" "web" {
+      + bucket = (known after apply)
+      + id     = (known after apply)
+      + policy = (known after apply)
+    }
+
+  # aws_s3_bucket_public_access_block.clips will be created
+  + resource "aws_s3_bucket_public_access_block" "clips" {
+      + block_public_acls       = true
+      + block_public_policy     = true
+      + bucket                  = (known after apply)
+      + id                      = (known after apply)
+      + ignore_public_acls      = true
+      + restrict_public_buckets = true
+    }
+
+  # aws_s3_bucket_public_access_block.web will be created
+  + resource "aws_s3_bucket_public_access_block" "web" {
+      + block_public_acls       = true
+      + block_public_policy     = true
+      + bucket                  = (known after apply)
+      + id                      = (known after apply)
+      + ignore_public_acls      = true
+      + restrict_public_buckets = true
+    }
+
+  # aws_s3_bucket_server_side_encryption_configuration.clips will be created
+  + resource "aws_s3_bucket_server_side_encryption_configuration" "clips" {
+      + bucket = (known after apply)
+      + id     = (known after apply)
+
+      + rule {
+          + apply_server_side_encryption_by_default {
+              + sse_algorithm     = "AES256"
+                # (1 unchanged attribute hidden)
+            }
+        }
+    }
+
+  # aws_s3_bucket_server_side_encryption_configuration.web will be created
+  + resource "aws_s3_bucket_server_side_encryption_configuration" "web" {
+      + bucket = (known after apply)
+      + id     = (known after apply)
+
+      + rule {
+          + apply_server_side_encryption_by_default {
+              + sse_algorithm     = "AES256"
+                # (1 unchanged attribute hidden)
+            }
+        }
+    }
+
+  # aws_s3_object.frontend["assets/sample.mp4"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "video/mp4"
+      + etag                   = "aa19e58077b709e004e3eaaa3ac63a5b"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "assets/sample.mp4"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/assets/sample.mp4"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["index.html"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/html; charset=utf-8"
+      + etag                   = "89363bd8b065c0b30b811d5eb3970d48"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "index.html"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/index.html"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/api/ApiClient.js"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/javascript; charset=utf-8"
+      + etag                   = "244862a1fcee260d0e7ede19942380da"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/api/ApiClient.js"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/api/ApiClient.js"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/api/MockApiClient.js"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/javascript; charset=utf-8"
+      + etag                   = "80c0ee3a561c3f33301930c1ec785f20"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/api/MockApiClient.js"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/api/MockApiClient.js"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/api/RealApiClient.js"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/javascript; charset=utf-8"
+      + etag                   = "a28414fdaf837dc37cb08c2599b2c954"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/api/RealApiClient.js"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/api/RealApiClient.js"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/app.js"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/javascript; charset=utf-8"
+      + etag                   = "afefd5bffd3ffe4de6b8388f4bd8c638"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/app.js"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/app.js"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/auth.js"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/javascript; charset=utf-8"
+      + etag                   = "6bce3f4a3b62809c5d6ec97f528157c0"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/auth.js"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/auth.js"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/form.js"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/javascript; charset=utf-8"
+      + etag                   = "aefca44eb16b126de1c0998163ad4fa8"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/form.js"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/form.js"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/jobs.js"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/javascript; charset=utf-8"
+      + etag                   = "c47f76685d539f6e8fc6d780a11b2d1a"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/jobs.js"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/jobs.js"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/mock/manifests/avatar.json"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "application/json"
+      + etag                   = "9913f76fbd5f5acce54f43971835b2c3"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/mock/manifests/avatar.json"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/mock/manifests/avatar.json"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/mock/manifests/first-last.json"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "application/json"
+      + etag                   = "35f9c132a7f222d3e5034b60a8022a5f"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/mock/manifests/first-last.json"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/mock/manifests/first-last.json"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/mock/manifests/references.json"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "application/json"
+      + etag                   = "00e01e0fb8f0546bbee8ddc60b77f207"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/mock/manifests/references.json"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/mock/manifests/references.json"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/mock/manifests/text-image.json"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "application/json"
+      + etag                   = "0411dbc90f736764914439c8c106edc2"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/mock/manifests/text-image.json"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/mock/manifests/text-image.json"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/mock/manifests/text.json"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "application/json"
+      + etag                   = "1c3874919ce72c05afadd4c2ee675279"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/mock/manifests/text.json"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/mock/manifests/text.json"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/mock/manifests/video-audio.json"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "application/json"
+      + etag                   = "4bb562b7baa921f3db3805f57bb8015b"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/mock/manifests/video-audio.json"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/mock/manifests/video-audio.json"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/mock/manifests/video.json"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "application/json"
+      + etag                   = "48e89b5604dd760482363bcf9a0b2f30"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/mock/manifests/video.json"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/mock/manifests/video.json"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["style.css"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/css; charset=utf-8"
+      + etag                   = "6630c761d2209e5dd9c25614d447e4bb"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "style.css"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/style.css"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.web_config will be created
+  + resource "aws_s3_object" "web_config" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = (known after apply)
+      + bucket_key_enabled     = (known after apply)
+      + cache_control          = "max-age=60"
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content                = (known after apply)
+      + content_type           = "application/json"
+      + etag                   = (known after apply)
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "config.json"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_security_group.instance will be created
+  + resource "aws_security_group" "instance" {
+      + arn                    = (known after apply)
+      + description            = "GPU worker instances: no inbound, all outbound"
+      + egress                 = [
+          + {
+              + cidr_blocks      = [
+                  + "0.0.0.0/0",
+                ]
+              + description      = "All outbound"
+              + from_port        = 0
+              + ipv6_cidr_blocks = []
+              + prefix_list_ids  = []
+              + protocol         = "-1"
+              + security_groups  = []
+              + self             = false
+              + to_port          = 0
+            },
+        ]
+      + id                     = (known after apply)
+      + ingress                = (known after apply)
+      + name                   = "aivideogen-instance"
+      + name_prefix            = (known after apply)
+      + owner_id               = (known after apply)
+      + revoke_rules_on_delete = false
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + vpc_id                 = (known after apply)
+    }
+
+  # aws_sns_topic.alerts will be created
+  + resource "aws_sns_topic" "alerts" {
+      + arn                         = (known after apply)
+      + beginning_archive_time      = (known after apply)
+      + content_based_deduplication = false
+      + fifo_throughput_scope       = (known after apply)
+      + fifo_topic                  = false
+      + id                          = (known after apply)
+      + name                        = "aivideogen-alerts"
+      + name_prefix                 = (known after apply)
+      + owner                       = (known after apply)
+      + policy                      = (known after apply)
+      + signature_version           = (known after apply)
+      + tags_all                    = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + tracing_config              = (known after apply)
+    }
+
+  # aws_sns_topic.budget will be created
+  + resource "aws_sns_topic" "budget" {
+      + arn                         = (known after apply)
+      + beginning_archive_time      = (known after apply)
+      + content_based_deduplication = false
+      + fifo_throughput_scope       = (known after apply)
+      + fifo_topic                  = false
+      + id                          = (known after apply)
+      + name                        = "aivideogen-budget-alert"
+      + name_prefix                 = (known after apply)
+      + owner                       = (known after apply)
+      + policy                      = (known after apply)
+      + signature_version           = (known after apply)
+      + tags_all                    = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + tracing_config              = (known after apply)
+    }
+
+  # aws_sns_topic_policy.budget will be created
+  + resource "aws_sns_topic_policy" "budget" {
+      + arn    = (known after apply)
+      + id     = (known after apply)
+      + owner  = (known after apply)
+      + policy = (known after apply)
+    }
+
+  # aws_sns_topic_subscription.alerts_email will be created
+  + resource "aws_sns_topic_subscription" "alerts_email" {
+      + arn                             = (known after apply)
+      + confirmation_timeout_in_minutes = 1
+      + confirmation_was_authenticated  = (known after apply)
+      + endpoint                        = (sensitive value)
+      + endpoint_auto_confirms          = false
+      + filter_policy_scope             = (known after apply)
+      + id                              = (known after apply)
+      + owner_id                        = (known after apply)
+      + pending_confirmation            = (known after apply)
+      + protocol                        = "email"
+      + raw_message_delivery            = false
+      + topic_arn                       = (known after apply)
+    }
+
+  # aws_sns_topic_subscription.budget_cutoff will be created
+  + resource "aws_sns_topic_subscription" "budget_cutoff" {
+      + arn                             = (known after apply)
+      + confirmation_timeout_in_minutes = 1
+      + confirmation_was_authenticated  = (known after apply)
+      + endpoint                        = (known after apply)
+      + endpoint_auto_confirms          = false
+      + filter_policy_scope             = (known after apply)
+      + id                              = (known after apply)
+      + owner_id                        = (known after apply)
+      + pending_confirmation            = (known after apply)
+      + protocol                        = "lambda"
+      + raw_message_delivery            = false
+      + topic_arn                       = (known after apply)
+    }
+
+  # aws_sqs_queue.dlq will be created
+  + resource "aws_sqs_queue" "dlq" {
+      + arn                               = (known after apply)
+      + content_based_deduplication       = false
+      + deduplication_scope               = (known after apply)
+      + delay_seconds                     = 0
+      + fifo_queue                        = false
+      + fifo_throughput_limit             = (known after apply)
+      + id                                = (known after apply)
+      + kms_data_key_reuse_period_seconds = 0
+      + max_message_size                  = 262144
+      + message_retention_seconds         = 1209600
+      + name                              = "aivideogen-jobs-dlq"
+      + name_prefix                       = (known after apply)
+      + policy                            = (known after apply)
+      + receive_wait_time_seconds         = 0
+      + redrive_allow_policy              = (known after apply)
+      + redrive_policy                    = (known after apply)
+      + sqs_managed_sse_enabled           = true
+      + tags_all                          = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + url                               = (known after apply)
+      + visibility_timeout_seconds        = 60
+    }
+
+  # aws_sqs_queue.jobs will be created
+  + resource "aws_sqs_queue" "jobs" {
+      + arn                               = (known after apply)
+      + content_based_deduplication       = false
+      + deduplication_scope               = (known after apply)
+      + delay_seconds                     = 0
+      + fifo_queue                        = false
+      + fifo_throughput_limit             = (known after apply)
+      + id                                = (known after apply)
+      + kms_data_key_reuse_period_seconds = 0
+      + max_message_size                  = 262144
+      + message_retention_seconds         = 86400
+      + name                              = "aivideogen-jobs"
+      + name_prefix                       = (known after apply)
+      + policy                            = (known after apply)
+      + receive_wait_time_seconds         = 0
+      + redrive_allow_policy              = (known after apply)
+      + redrive_policy                    = (known after apply)
+      + sqs_managed_sse_enabled           = true
+      + tags_all                          = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + url                               = (known after apply)
+      + visibility_timeout_seconds        = 180
+    }
+
+  # aws_sqs_queue_redrive_allow_policy.dlq will be created
+  + resource "aws_sqs_queue_redrive_allow_policy" "dlq" {
+      + id                   = (known after apply)
+      + queue_url            = (known after apply)
+      + redrive_allow_policy = (known after apply)
+    }
+
+  # aws_subnet.public["us-west-2a"] will be created
+  + resource "aws_subnet" "public" {
+      + arn                                            = (known after apply)
+      + assign_ipv6_address_on_creation                = false
+      + availability_zone                              = "us-west-2a"
+      + availability_zone_id                           = (known after apply)
+      + cidr_block                                     = "10.0.0.0/24"
+      + enable_dns64                                   = false
+      + enable_resource_name_dns_a_record_on_launch    = false
+      + enable_resource_name_dns_aaaa_record_on_launch = false
+      + id                                             = (known after apply)
+      + ipv6_cidr_block_association_id                 = (known after apply)
+      + ipv6_native                                    = false
+      + map_public_ip_on_launch                        = true
+      + owner_id                                       = (known after apply)
+      + private_dns_hostname_type_on_launch            = (known after apply)
+      + tags                                           = {
+          + "Name" = "aivideogen-public-us-west-2a"
+        }
+      + tags_all                                       = {
+          + "ManagedBy" = "Terraform"
+          + "Name"      = "aivideogen-public-us-west-2a"
+          + "Project"   = "AIVideoGen"
+        }
+      + vpc_id                                         = (known after apply)
+    }
+
+  # aws_subnet.public["us-west-2b"] will be created
+  + resource "aws_subnet" "public" {
+      + arn                                            = (known after apply)
+      + assign_ipv6_address_on_creation                = false
+      + availability_zone                              = "us-west-2b"
+      + availability_zone_id                           = (known after apply)
+      + cidr_block                                     = "10.0.1.0/24"
+      + enable_dns64                                   = false
+      + enable_resource_name_dns_a_record_on_launch    = false
+      + enable_resource_name_dns_aaaa_record_on_launch = false
+      + id                                             = (known after apply)
+      + ipv6_cidr_block_association_id                 = (known after apply)
+      + ipv6_native                                    = false
+      + map_public_ip_on_launch                        = true
+      + owner_id                                       = (known after apply)
+      + private_dns_hostname_type_on_launch            = (known after apply)
+      + tags                                           = {
+          + "Name" = "aivideogen-public-us-west-2b"
+        }
+      + tags_all                                       = {
+          + "ManagedBy" = "Terraform"
+          + "Name"      = "aivideogen-public-us-west-2b"
+          + "Project"   = "AIVideoGen"
+        }
+      + vpc_id                                         = (known after apply)
+    }
+
+  # aws_vpc.main will be created
+  + resource "aws_vpc" "main" {
+      + arn                                  = (known after apply)
+      + cidr_block                           = "10.0.0.0/16"
+      + default_network_acl_id               = (known after apply)
+      + default_route_table_id               = (known after apply)
+      + default_security_group_id            = (known after apply)
+      + dhcp_options_id                      = (known after apply)
+      + enable_dns_hostnames                 = true
+      + enable_dns_support                   = true
+      + enable_network_address_usage_metrics = (known after apply)
+      + id                                   = (known after apply)
+      + instance_tenancy                     = "default"
+      + ipv6_association_id                  = (known after apply)
+      + ipv6_cidr_block                      = (known after apply)
+      + ipv6_cidr_block_network_border_group = (known after apply)
+      + main_route_table_id                  = (known after apply)
+      + owner_id                             = (known after apply)
+      + tags                                 = {
+          + "Name" = "aivideogen"
+        }
+      + tags_all                             = {
+          + "ManagedBy" = "Terraform"
+          + "Name"      = "aivideogen"
+          + "Project"   = "AIVideoGen"
+        }
+    }
+
+  # aws_vpc_endpoint.s3 will be created
+  + resource "aws_vpc_endpoint" "s3" {
+      + arn                   = (known after apply)
+      + cidr_blocks           = (known after apply)
+      + dns_entry             = (known after apply)
+      + id                    = (known after apply)
+      + ip_address_type       = (known after apply)
+      + network_interface_ids = (known after apply)
+      + owner_id              = (known after apply)
+      + policy                = (known after apply)
+      + prefix_list_id        = (known after apply)
+      + private_dns_enabled   = (known after apply)
+      + requester_managed     = (known after apply)
+      + route_table_ids       = (known after apply)
+      + security_group_ids    = (known after apply)
+      + service_name          = "com.amazonaws.us-west-2.s3"
+      + service_region        = (known after apply)
+      + state                 = (known after apply)
+      + subnet_ids            = (known after apply)
+      + tags                  = {
+          + "Name" = "aivideogen-s3"
+        }
+      + tags_all              = {
+          + "ManagedBy" = "Terraform"
+          + "Name"      = "aivideogen-s3"
+          + "Project"   = "AIVideoGen"
+        }
+      + vpc_endpoint_type     = "Gateway"
+      + vpc_id                = (known after apply)
+
+      + dns_options (known after apply)
+
+      + subnet_configuration (known after apply)
+    }
+
+Plan: 95 to add, 0 to change, 0 to destroy.
+
+Changes to Outputs:
+  + api_url                = (known after apply)
+  + asg_name               = "aivideogen-gpu"
+  + budget_alert_topic_arn = (known after apply)
+  + clips_bucket           = "aivideogen-clips-477656043770"
+  + cognito_client_id      = (known after apply)
+  + cognito_user_pool_id   = (known after apply)
+  + dlq_url                = (known after apply)
+  + ecr_repository_url     = (known after apply)
+  + ecs_cluster            = "aivideogen"
+  + queue_url              = (known after apply)
+  + vpc_id                 = (known after apply)
+  + web_bucket             = "aivideogen-web-477656043770"
+  + web_url                = (known after apply)
+
+─────────────────────────────────────────────────────────────────────────────
+
+Saved the plan to: tfplan
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "tfplan"
+Releasing state lock. This may take a few moments...
