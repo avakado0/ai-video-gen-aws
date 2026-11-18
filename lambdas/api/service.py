@@ -3,7 +3,7 @@ import logging
 import uuid
 from datetime import datetime, timezone
 
-from . import rules
+from common import rules
 from .usage import log_usage
 
 log = logging.getLogger(__name__)

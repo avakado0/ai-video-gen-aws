@@ -2,7 +2,7 @@
 import os
 from dataclasses import dataclass
 
-from . import manifest as manifest_module
+from common import manifest as manifest_module
 
 
 @dataclass(frozen=True)

@@ -5,7 +5,7 @@ import pathlib
 
 import pytest
 
-from api import manifest
+from common import manifest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 V1 = ROOT / "model_manifest.json"

@@ -2,6 +2,7 @@
 # Build the folder Terraform zips for the API Lambda: build/api/
 #
 #   api/            the app (lambdas/api), imported as `api.handler` by Lambda
+#   common/         code shared with the worker (lambdas/common)
 #   <dependencies>  FastAPI, Mangum and friends from requirements-api.txt
 #
 # Run it before `terraform plan` whenever lambdas/api/ or requirements-api.txt changed.
@@ -23,6 +24,7 @@ python3 -m pip install \
   -r requirements-api.txt
 
 cp -r lambdas/api "$out/api"
+cp -r lambdas/common "$out/common"
 
 # Keep the zip identical for identical input: no bytecode, no timestamps, no console scripts.
 find "$out" -name __pycache__ -type d -prune -exec rm -rf {} +

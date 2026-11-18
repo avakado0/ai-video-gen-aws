@@ -6,7 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel, StrictInt, StrictStr
 
-from .rules import RequestError
+from common.rules import RequestError
 
 
 def _sub_from_claims(scope):
