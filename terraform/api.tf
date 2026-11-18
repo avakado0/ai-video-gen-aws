@@ -31,6 +31,8 @@ resource "aws_lambda_function" "api" {
       CLIPS_BUCKET    = aws_s3_bucket.clips.bucket
       QUEUE_URL       = aws_sqs_queue.jobs.url
       MAX_ACTIVE_JOBS = "3"
+      # Undo window: a new job stays invisible to workers this long, so a quick Cancel is free.
+      SUBMIT_DELAY_SECONDS = "30"
       # One source of truth for the model's inputs and params (spec 3B). Re-encoded
       # to one line; the app validates it on every cold start.
       MODEL_MANIFEST = jsonencode(jsondecode(file("${path.module}/../model_manifest.json")))
