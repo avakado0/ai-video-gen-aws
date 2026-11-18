@@ -104,7 +104,7 @@ export class ManifestForm {
     }
     if (p.type === 'string') return el('input', { type: 'text', value: p.default ?? '', maxLength: p.max_chars ?? 200 });
     return el('input', {
-      type: 'number', value: p.default, min: p.min, max: p.max, step: p.type === 'int' ? 1 : 'any',
+      type: 'number', value: p.default ?? '', min: p.min, max: p.max, step: p.type === 'int' ? 1 : 'any',
     });
   }
 
@@ -113,6 +113,7 @@ export class ManifestForm {
     if (p.type === 'bool') return c.checked;
     if (p.type === 'enum') return c.value;
     if (p.type === 'string') return c.value.trim();
+    if (c.value.trim() === '') return null; // blank number box = unset (the API fills the default, or leaves it out)
     return p.type === 'int' ? parseInt(c.value, 10) : parseFloat(c.value);
   }
 
@@ -135,6 +136,7 @@ export class ManifestForm {
     const e = this.errors[field] ?? this.errors.prompt;
     e.textContent = message;
     e.hidden = false;
+    e.closest('details')?.setAttribute('open', ''); // an error inside collapsed Advanced must be visible
   }
 
   /** Client-side mirror of the API's manifest checks. @returns {Promise<boolean>} true if valid */
@@ -166,7 +168,7 @@ export class ManifestForm {
 
     for (const p of params ?? []) {
       const val = v.params[p.name];
-      if ((p.type === 'int' || p.type === 'float') && (Number.isNaN(val) || val < p.min || val > p.max)) {
+      if ((p.type === 'int' || p.type === 'float') && val !== null && (Number.isNaN(val) || val < p.min || val > p.max)) {
         fail(`param:${p.name}`, `Enter a number from ${p.min} to ${p.max}.`);
       }
     }
