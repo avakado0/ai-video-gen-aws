@@ -1,3 +1,4 @@
+-r requirements-api.txt
 pytest==8.3.4
 moto[s3,sqs,autoscaling,ec2]==5.2.5
 boto3==1.44.3

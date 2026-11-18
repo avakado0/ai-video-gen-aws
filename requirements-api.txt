@@ -1,0 +1,14 @@
+# Runtime dependencies of the API Lambda (scripts/build_api.sh installs these into the zip).
+# boto3 is left out on purpose: the Lambda runtime provides it.
+annotated-doc==0.0.7
+annotated-types==0.8.0
+anyio==4.16.0
+fastapi==0.164.0
+idna==3.20
+mangum==0.22.0
+opentelemetry-api==1.45.2
+pydantic==2.14.3
+pydantic_core==2.50.4
+starlette==1.10.0
+typing-inspection==0.4.5
+typing_extensions==4.16.0
