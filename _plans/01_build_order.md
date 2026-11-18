@@ -49,8 +49,8 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 ## Phase 3: First deploy at `gpu_max = 0`
 
-- [ ] H. Review the `terraform plan` output. Gate: no NAT, ALB or interface endpoint, no GPU instance. First plan 2026-11-18: 95 to add, 0 change, 0 destroy; gate passes (S3 endpoint is Gateway, ASG min/max 0, no NAT/ALB/instance). Tick after the `-out` plan that apply uses.
-- [ ] H. `terraform apply` with the `terraform-deployer` profile.
+- [x] H. Review the `terraform plan` output. Gate: no NAT, ALB or interface endpoint, no GPU instance. First plan 2026-11-18: 95 to add, 0 change, 0 destroy; gate passes (S3 endpoint is Gateway, ASG min/max 0, no NAT/ALB/instance). The `-out` plan of 2026-11-18 matched (text in `terraform/plans/2026-11-18_first_apply.txt`).
+- [x] H. `terraform apply` with the `terraform-deployer` profile. Done 2026-11-18: 95 added. Smoke test: web URL and `config.json` return 200, API returns 401 without a token (authorizer works).
 - [ ] H. Confirm the SNS email subscription. Attach the Terraform SNS topic to the budget's 100% alert.
 - [ ] H. Create Cognito users in the console.
 - [ ] C. Run the front end in real mode against the deployed API. Jobs stay queued; that is expected.
