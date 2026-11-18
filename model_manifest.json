@@ -1,0 +1,28 @@
+{
+  "model": "wan2-1-t2v-1-3b",
+  "prompt": "required",
+  "limits": {
+    "prompt_max_chars": 500
+  },
+  "inputs": [],
+  "params": [
+    {
+      "name": "seed",
+      "type": "int",
+      "min": 0,
+      "max": 2147483647
+    },
+    {
+      "name": "duration_seconds",
+      "type": "enum",
+      "default": "3",
+      "values": ["3", "5"]
+    },
+    {
+      "name": "negative_prompt",
+      "type": "string",
+      "default": "",
+      "max_chars": 200
+    }
+  ]
+}
