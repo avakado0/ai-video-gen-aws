@@ -1,6 +1,6 @@
 # 02: GPU worker (code, tests, Dockerfile)
 
-Status: planned 2026-11-18, not started.
+Status: built 2026-11-18 (code, tests, Dockerfile). Nothing run on a GPU, image not built, `ecs.tf` change not applied.
 
 ## Context
 The front half works (API deployed, jobs queue as pending). Nothing reads the queue. The worker takes the SQS message, checks the job is still wanted, runs the model, uploads the clip, and reports failure or cancel correctly. Spec: section 4 and 3D/3E; the cancel re-checks were decided 2026-11-18.
@@ -71,3 +71,11 @@ Real model output and speed (the Kaggle spike runs the same `WanGenerator`), doc
 - Create a Kaggle account for the spike.
 - Run `scripts/build_push.sh` with `AWS_PROFILE=terraform-deployer` (profile reminder and account check first).
 - Deploying the `ecs.tf` change is one `terraform plan` / `apply` by the owner.
+
+## What changed while building (2026-11-18)
+- `usage.py` also moved to `lambdas/common/`, so the API and the worker share one log helper.
+- No `Cancelled` exception: the watcher's `reason` ("cancelled" or "interrupted") decides, and the runner acts after the watcher thread has stopped (a race found by a test: a late heartbeat re-hid a released message).
+- `gpu_seconds` is receive-to-finish wall-clock and the success outcome is `ok`, as spec 3H says. Other outcomes were added: `cancelled`, `stale`, `error`.
+- `ecs.tf` also gets `AWS_DEFAULT_REGION` (boto3 needs one in the container).
+- Image: `python:3.12-slim` plus the PyPI `torch` wheel instead of a CUDA base image. Requirements pinned from PyPI metadata (newest release at least 30 days old for fast-moving packages).
+- Test count: 257 (170 before).
