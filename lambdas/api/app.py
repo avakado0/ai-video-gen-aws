@@ -1,7 +1,7 @@
 """The FastAPI app. Routes stay thin; the rules live in the modules they call."""
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from typing import Any
 
 from pydantic import BaseModel, StrictInt, StrictStr
@@ -71,5 +71,18 @@ def create_app(manifest: dict, service) -> FastAPI:
     @app.post("/jobs", status_code=201)
     def post_job(body: SubmitRequest, sub: str = Depends(current_sub)):
         return {"job_id": service.submit(sub, body.prompt, body.params, body.inputs, body.job_id)}
+
+    @app.get("/jobs")
+    def list_jobs(sub: str = Depends(current_sub)):
+        return {"jobs": service.list_jobs(sub)}
+
+    @app.get("/jobs/{job_id}")
+    def get_job(job_id: str, sub: str = Depends(current_sub)):
+        return service.get_job(sub, job_id)
+
+    @app.delete("/jobs/{job_id}", status_code=204)
+    def delete_job(job_id: str, sub: str = Depends(current_sub)):
+        service.delete_job(sub, job_id)
+        return Response(status_code=204)
 
     return app

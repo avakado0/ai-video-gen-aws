@@ -11,6 +11,7 @@ import json
 from botocore.exceptions import ClientError
 
 UPLOAD_EXPIRES = 900  # 15 minutes to start the upload
+DOWNLOAD_EXPIRES = 21600  # 6 hours; best effort, the API mints a fresh URL on every GET (spec 3C)
 MISSING = ("404", "NoSuchKey", "NotFound")
 EXTENSIONS = ("pending", "mp4", "failed")
 
@@ -63,3 +64,20 @@ class JobStore:
                 if ext in EXTENSIONS:
                     jobs.setdefault(job_id, {})[ext] = obj["LastModified"]
         return jobs
+
+    def read_json(self, key):
+        """The JSON object stored at key, or None when it is missing or not readable."""
+        try:
+            body = self.s3.get_object(Bucket=self.bucket, Key=key)["Body"].read()
+            data = json.loads(body)
+        except ClientError as e:
+            if e.response["Error"]["Code"] in MISSING:
+                return None
+            raise
+        except ValueError:
+            return None
+        return data if isinstance(data, dict) else None
+
+    def presigned_get(self, key):
+        return self.s3.generate_presigned_url("get_object", Params={"Bucket": self.bucket, "Key": key},
+                                              ExpiresIn=DOWNLOAD_EXPIRES)

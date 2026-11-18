@@ -60,3 +60,55 @@ class JobService:
         if counts:
             log_usage("inputs", sub=sub, job_id=job_id, bytes=total)
         return job_id
+
+    # --- reading job state -------------------------------------------------------
+
+    def _view(self, sub, job_id, status, modified):
+        """One job as the client sees it. `modified` backs up `created` when the marker is gone."""
+        marker = self.store.read_json(self.store.clip_key(sub, job_id, "pending")) or {}
+        view = {"id": job_id, "status": status}
+        if isinstance(marker.get("prompt"), str):
+            view["prompt"] = marker["prompt"]
+        created = marker.get("created")
+        view["created"] = created if isinstance(created, str) else modified.isoformat()
+        if status == "failed":
+            reason = self.store.read_json(self.store.clip_key(sub, job_id, "failed"))
+            view["reason"] = reason or {"code": "internal", "message": "The job failed."}
+        return view
+
+    def list_jobs(self, sub):
+        """The caller's jobs, newest first. Found by listing `clips/{sub}/`: there is no database."""
+        jobs = []
+        for job_id, files in self.store.list_jobs(sub).items():
+            status = "ready" if "mp4" in files else "failed" if "failed" in files else "pending"
+            jobs.append(self._view(sub, job_id, status, min(files.values())))
+        return sorted(jobs, key=lambda j: j["created"], reverse=True)
+
+    def get_job(self, sub, job_id):
+        """ready (with a fresh pre-signed URL), failed (with the reason) or pending; 404 if none."""
+        rules.parse_job_id(job_id)
+        for ext, status in (("mp4", "ready"), ("failed", "failed"), ("pending", "pending")):
+            key = self.store.clip_key(sub, job_id, ext)
+            head = self.store.head(key)
+            if head is not None:
+                view = self._view(sub, job_id, status, head["LastModified"])
+                if status == "ready":
+                    view["url"] = self.store.presigned_get(key)
+                return view
+        raise rules.RequestError(404, "Job not found")
+
+    def delete_job(self, sub, job_id):
+        """After a confirmed download (or to cancel): remove the clip, the failure and the marker."""
+        rules.parse_job_id(job_id)
+        found = {}
+        for ext in ("mp4", "failed", "pending"):
+            key = self.store.clip_key(sub, job_id, ext)
+            head = self.store.head(key)
+            if head is not None:
+                found[key] = (ext, head)
+        if not found:
+            raise rules.RequestError(404, "Job not found")
+        self.store.delete(list(found))
+        for ext, head in found.values():
+            if ext == "mp4":
+                log_usage("download", sub=sub, job_id=job_id, bytes=head["ContentLength"])
