@@ -7,6 +7,7 @@ from botocore.config import Config
 from mangum import Mangum
 
 from .app import create_app
+from .jobqueue import JobQueue
 from .service import JobService
 from .settings import Settings
 from .store import JobStore
@@ -28,7 +29,8 @@ def _build():
     # Signature v4 and virtual-host addressing: pre-signed URLs and POSTs for a bucket in a
     # non-default region must point at the regional endpoint, or browsers get redirected.
     s3 = boto3.client("s3", config=Config(signature_version="s3v4", s3={"addressing_style": "virtual"}))
-    service = JobService(JobStore(s3, settings.clips_bucket), settings.manifest)
+    service = JobService(JobStore(s3, settings.clips_bucket), JobQueue(boto3.client("sqs"), settings.queue_url),
+                         settings.manifest, settings.max_active_jobs)
     return Mangum(create_app(settings.manifest, service), lifespan="off")
 
 

@@ -2,6 +2,8 @@
 from fastapi import Depends, FastAPI, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
+from typing import Any
+
 from pydantic import BaseModel, StrictInt, StrictStr
 
 from .rules import RequestError
@@ -25,6 +27,13 @@ class UploadRequest(BaseModel):
     mime: StrictStr
     size: StrictInt
     job_id: StrictStr | None = None
+
+
+class SubmitRequest(BaseModel):
+    job_id: StrictStr | None = None
+    prompt: StrictStr = ""
+    params: dict[str, Any] = {}
+    inputs: dict[str, StrictInt] = {}
 
 
 def create_app(manifest: dict, service) -> FastAPI:
@@ -58,5 +67,9 @@ def create_app(manifest: dict, service) -> FastAPI:
     @app.post("/uploads")
     def post_upload(body: UploadRequest, sub: str = Depends(current_sub)):
         return service.create_upload(sub, body.slot, body.index, body.mime, body.size, body.job_id)
+
+    @app.post("/jobs", status_code=201)
+    def post_job(body: SubmitRequest, sub: str = Depends(current_sub)):
+        return {"job_id": service.submit(sub, body.prompt, body.params, body.inputs, body.job_id)}
 
     return app
