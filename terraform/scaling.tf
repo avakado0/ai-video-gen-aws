@@ -9,7 +9,10 @@ resource "aws_appautoscaling_target" "worker" {
   scalable_dimension = "ecs:service:DesiredCount"
   resource_id        = "service/${aws_ecs_cluster.main.name}/${aws_ecs_service.worker.name}"
   min_capacity       = 0
-  max_capacity       = 2 # the ASG's own max_size (gpu_max) is the real ceiling
+  # Follows the ASG limit: 1 while the owner is the only user (decided 2026-11-18), 2 when friends
+  # join. The ASG's own max_size (gpu_max) is the real ceiling. Ignored on later applies (below),
+  # so the live value is changed by hand, together with the ASG limit.
+  max_capacity = 1
 
   # The budget cut-off sets this to 0 (ADR 0004); an apply must not undo it.
   # Restore by hand after reviewing the bill.
