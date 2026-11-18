@@ -66,3 +66,33 @@ def call(aws):
     def _call(method, path, **kw):
         return Response(handler.lambda_handler(make_event(method, path, **kw), None))
     return _call
+
+
+# A model with uploads, so slot rules can be tested (v1 has none).
+IMAGE_TO_VIDEO = {
+    "model": "test-i2v",
+    "prompt": "required",
+    "limits": {"prompt_max_chars": 50},
+    "inputs": [
+        {"name": "image", "label": "Image", "kind": "image", "required": True,
+         "mime": ["image/png", "image/jpeg"], "max_bytes": 1000},
+        {"name": "refs", "label": "References", "kind": "image", "required": False, "max_files": 3,
+         "mime": ["image/png"], "max_bytes": 500},
+    ],
+    "params": [
+        {"name": "seed", "type": "int", "min": 0, "max": 100},
+        {"name": "strength", "type": "float", "min": 0, "max": 1, "default": 0.5},
+        {"name": "style", "type": "enum", "values": ["plain", "fancy"], "default": "plain"},
+        {"name": "hd", "type": "bool", "default": False},
+        {"name": "negative_prompt", "type": "string", "default": "", "max_chars": 10},
+    ],
+}
+
+
+@pytest.fixture
+def use_manifest(monkeypatch, aws):
+    """Serve a different manifest from the Lambda (call before the first request)."""
+    def _use(manifest):
+        monkeypatch.setenv("MODEL_MANIFEST", json.dumps(manifest))
+        handler.reset()
+    return _use
