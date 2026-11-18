@@ -3,8 +3,9 @@
 # Only top-level packages are pinned; pip resolves the rest at image build time.
 #
 # diffusers must stay at 0.35.x or older: a NaN regression was reported after 0.35
-# (diffusers issue #12612, spec section 5). transformers 4.57 is the last 4.x release and
-# the one diffusers 0.35 was written against (transformers 5 is not).
+# (diffusers issue #12612, spec section 5). transformers 4.57.6 is the last 4.x release; 5.x is
+# newer than diffusers 0.35 and was not checked against it. The set resolves only when the image
+# is built, which has not happened yet.
 # torch 2.8.0 from PyPI is the CUDA 12.8 build; it carries its own CUDA libraries, so the image
 # needs only the NVIDIA driver the ECS GPU AMI provides.
 torch==2.8.0
