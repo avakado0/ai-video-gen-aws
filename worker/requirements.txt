@@ -1,0 +1,20 @@
+# Worker image dependencies, pinned exactly. Versions were looked up on PyPI on 2026-11-18; the ones
+# that change often are the newest release at least 30 days old, not the newest.
+# Only top-level packages are pinned; pip resolves the rest at image build time.
+#
+# diffusers must stay at 0.35.x or older: a NaN regression was reported after 0.35
+# (diffusers issue #12612, spec section 5). transformers 4.57 is the last 4.x release and
+# the one diffusers 0.35 was written against (transformers 5 is not).
+# torch 2.8.0 from PyPI is the CUDA 12.8 build; it carries its own CUDA libraries, so the image
+# needs only the NVIDIA driver the ECS GPU AMI provides.
+torch==2.8.0
+diffusers==0.35.2
+transformers==4.57.6
+accelerate==1.15.0
+safetensors==0.8.0
+sentencepiece==0.2.2
+ftfy==6.3.1
+regex==2026.9.29
+imageio==2.38.1
+imageio-ffmpeg==0.6.0
+boto3==1.44.3

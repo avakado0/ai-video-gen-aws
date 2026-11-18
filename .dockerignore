@@ -1,0 +1,5 @@
+# Keep the build context small: the worker image needs only worker/ and lambdas/common/.
+*
+!worker
+!lambdas/common
+**/__pycache__
