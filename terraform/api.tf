@@ -78,12 +78,14 @@ resource "aws_apigatewayv2_route" "all" {
 }
 
 # CORS preflight. Browsers send OPTIONS without the token, so under the JWT
-# route above it got 401 and every fetch failed. A more specific OPTIONS route
-# with no authorizer and no target lets API Gateway answer the preflight from
-# cors_configuration; the Lambda is never called and no data is exposed.
+# route above it got 401 and every fetch failed. This OPTIONS route has no
+# authorizer. A route with no target did not help (still 401, tested
+# 2026-11-18), so it goes to the Lambda, which answers OPTIONS with 204 and
+# nothing else; API Gateway adds the CORS headers from cors_configuration.
 resource "aws_apigatewayv2_route" "preflight" {
   api_id    = aws_apigatewayv2_api.main.id
   route_key = "OPTIONS /{proxy+}"
+  target    = "integrations/${aws_apigatewayv2_integration.api.id}"
 }
 
 resource "aws_apigatewayv2_stage" "default" {
