@@ -114,7 +114,7 @@ def env(aws, tmp_path):
 
 def test_success_uploads_the_clip_and_deletes_the_message(env):
     env.submit()
-    assert env.run_one() == "success"
+    assert env.run_one() == "ok"
     assert f"clips/{SUB}/{JOB_ID}.mp4" in env.keys()
     assert env.counts() == (0, 0)
 
@@ -145,7 +145,7 @@ def test_one_usage_line_per_attempt(env):
     (line,) = env.usage
     assert line["event"] == "job_attempt"
     assert (line["sub"], line["job_id"], line["attempt"], line["instance_type"], line["outcome"]) == (
-        SUB, JOB_ID, 1, "g4dn.2xlarge", "success")
+        SUB, JOB_ID, 1, "g4dn.2xlarge", "ok")
     assert line["gpu_seconds"] >= 0
 
 
@@ -155,7 +155,7 @@ def test_stale_message_is_dropped_without_touching_the_gpu(env):
     env.submit(marker=False)
     assert env.run_one() == "stale"
     assert env.generator.calls == [] and env.counts() == (0, 0)
-    assert env.usage[0]["outcome"] == "stale" and env.usage[0]["gpu_seconds"] == 0
+    assert env.usage[0]["outcome"] == "stale" and env.usage[0]["gpu_seconds"] < 5
     assert env.protection.calls == []
 
 
@@ -309,7 +309,7 @@ def test_protection_failure_does_not_stop_the_job(env):
 
     env.protection.protect = broken
     env.submit()
-    assert env.run_one() == "success"
+    assert env.run_one() == "ok"
 
 
 # --- the loop ------------------------------------------------------------------------
@@ -327,11 +327,11 @@ def test_heartbeat_extends_visibility_while_running(env):
 
     env.generator.script = script
     env.submit()
-    assert env.run_one() == "success"
+    assert env.run_one() == "ok"
     assert extended and extended[0] == env.worker.config.visibility_timeout
 
 
-def test_gpu_seconds_are_logged_even_when_the_run_blows_up(env):
+def test_seconds_are_logged_even_when_the_run_blows_up(env):
     ticks = iter(range(0, 1000, 10))
     env.worker.clock = lambda: next(ticks)
 

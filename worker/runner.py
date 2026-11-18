@@ -1,7 +1,7 @@
 """One job from receive to delete (spec section 4).
 
 Outcomes, as written to the usage log:
-  success    clip uploaded, message deleted
+  ok         clip uploaded, message deleted
   stale      the job's marker was already gone: message deleted, GPU never used
   cancelled  the marker vanished mid-run or before upload: message and inputs deleted, nothing uploaded
   released   Spot notice or SIGTERM: message handed back at once for another worker
@@ -50,7 +50,7 @@ class Worker:
             self.queue.delete(message)
             return "bad_message"
 
-        self._gpu_seconds = 0.0
+        started = self.clock()        # spec 3H: wall-clock from receive to delete or release
         outcome = "error"
         try:
             outcome = self._attempt(message, job)
@@ -59,7 +59,7 @@ class Worker:
             self._release(message)
         finally:
             self.log_usage("job_attempt", sub=job.sub, job_id=job.job_id, attempt=job.receive_count,
-                           instance_type=self.instance_type(), gpu_seconds=round(self._gpu_seconds, 1), outcome=outcome)
+                           instance_type=self.instance_type(), gpu_seconds=round(self.clock() - started, 1), outcome=outcome)
         return outcome
 
     # --- one attempt ---------------------------------------------------------------
@@ -85,12 +85,8 @@ class Worker:
             with watcher:
                 scratch.mkdir(parents=True, exist_ok=True)
                 inputs = self.store.fetch_inputs(job, scratch / "inputs")
-                started = self.clock()
                 try:
-                    try:
-                        clip = self.generator.generate(job, inputs, watcher.should_abort, scratch)
-                    finally:
-                        self._gpu_seconds = self.clock() - started   # counted even when the run blows up
+                    clip = self.generator.generate(job, inputs, watcher.should_abort, scratch)
                 except Aborted:
                     outcome = "cancelled" if watcher.reason == "cancelled" else "released"
                 except PermanentJobError as e:
@@ -98,7 +94,7 @@ class Worker:
                     outcome = "failed"
                 else:
                     outcome = self._decide(watcher, job)
-                    if outcome == "success":
+                    if outcome == "ok":
                         self.store.upload_clip(job.sub, job.job_id, clip)
             # The watcher thread has stopped, so its heartbeat cannot undo what follows.
             if outcome == "released":
@@ -117,7 +113,7 @@ class Worker:
         # Last look before the upload: a cancel in the final seconds must not leave a clip.
         if watcher.reason == "cancelled" or not self.store.marker_exists(job.sub, job.job_id):
             return "cancelled"
-        return "success"
+        return "ok"
 
     # --- helpers -------------------------------------------------------------------
 
