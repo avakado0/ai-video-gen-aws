@@ -19,6 +19,7 @@ export class Auth {
     sessionStorage.setItem(KEY, JSON.stringify({ ...tokens, expiresAt: Date.now() + tokens.expires_in * 1000 }));
   }
 
+  /** Redirects to the hosted UI. The returned promise never settles. */
   async login() {
     const verifier = randomString(64);
     const challenge = b64url(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(verifier)));
@@ -28,6 +29,7 @@ export class Auth {
       scope: 'openid email', code_challenge_method: 'S256', code_challenge: challenge,
     });
     location.href = `https://${this.cfg.domain}/oauth2/authorize?${q}`;
+    return new Promise(() => {}); // navigating away: never resolve, so callers cannot reload over the redirect
   }
 
   /** Finish the redirect if the URL carries ?code=. */
@@ -66,5 +68,6 @@ export class Auth {
     sessionStorage.removeItem(KEY);
     const q = new URLSearchParams({ client_id: this.cfg.clientId, logout_uri: this.cfg.redirectUri });
     location.href = `https://${this.cfg.domain}/logout?${q}`;
+    return new Promise(() => {}); // same as login()
   }
 }
