@@ -70,3 +70,5 @@ Thumbs.db
 # Misc
 
 _effort_logs
+
+terraform/std_outputs/apply_output.txt
