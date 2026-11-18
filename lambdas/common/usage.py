@@ -1,4 +1,4 @@
-"""Usage log lines for per-user cost attribution (spec 3H).
+"""Usage log lines for per-user cost attribution (spec 3H), written by the API and the worker.
 
 One bare JSON object per line on stdout, so CloudWatch Logs Insights finds the fields
 without parsing a prefix.
