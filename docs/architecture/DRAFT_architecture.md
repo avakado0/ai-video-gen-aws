@@ -167,7 +167,7 @@ All users share the same instances, queue, Lambdas and buckets, so the AWS bill 
   * `attempt` is the message's `ApproximateReceiveCount` (request it with `MessageSystemAttributeNames=["ApproximateReceiveCount"]`).
   * `instance_type` comes from IMDS (`meta-data/instance-type`), because g4dn and g5 are priced differently.
   * `gpu_seconds` is wall-clock time from receive to delete or release.
-  * `outcome` is one of `ok`, `failed`, `released`. Work lost to a Spot release still counts toward the user whose job it was.
+  * `outcome` is one of `ok`, `failed`, `released` (Spot or SIGTERM), `cancelled` (the user cancelled mid-run), `stale` (the marker was already gone), `error` (unexpected, handed back for retry). Work lost to a Spot release still counts toward the user whose job it was.
   * A worker killed without warning writes no line; that time falls into overhead.
 * **API usage log:** on `DELETE /jobs/{job_id}` (download confirmed), the API HEADs the clip before deleting it and logs:
   `{"event": "download", "sub", "job_id", "bytes"}`
@@ -191,6 +191,17 @@ The worker handles one job at a time. Spot withdrawal is a **release, not a fail
 * **Stale job:** before any GPU work, the worker HEADs `clips/{sub}/{job_id}.pending`. If the HEAD returns 404 (lifecycle expiry, or the user deleted the job), it deletes the message and does nothing else. Any other error, a 403 included, is a normal error and the job is retried, so a permission mistake never silently drops jobs. The task role has `s3:GetObject` on `clips/*.pending` and unconditional `s3:ListBucket` on the clips bucket (without it a missing key returns 403): no `.failed` marker, no clip. This also stops queued test jobs from phases 3 to 6 from burning GPU time at go-live, and keeps the 3-job cap from leaking (an expired marker's message never produces a clip). Lifecycle expiry is asynchronous, so a marker can outlive its day slightly; the check is what matters, not the timing.
 * **Permanent job error** (e.g., invalid prompt, corrupt image or video, no face found in an avatar image, expired input): the worker writes `clips/{sub}/{job_id}.failed` with a JSON reason (`{"code": "invalid_input", "field", "message"}`) and deletes the message (fast path).
 * **Unexpected error or hard crash:** the message is released or reappears and is retried. After 8 receives it moves to the DLQ and the failure-marker Lambda writes the `.failed` marker (section 3D).
+
+**Code layout (`worker/`, built 2026-11-18, tests in `tests/worker/`).** The pseudo-code below is the idea; the real code differs in these ways:
+
+* `runner.py` (`Worker.handle`) does one message; `watcher.py` is a side thread per job. The watcher polls the Spot notice (`imds.py`) and SIGTERM every 5 s, and once a minute HEADs the `.pending` marker and extends the message's visibility. It never raises. The generator only reads `watcher.should_abort()`, so "between diffusion steps" means reading that flag, not one HEAD per step.
+* The watcher thread is stopped before the message is released or deleted, so a late heartbeat cannot hide a message that was just handed back. (A test caught this race.)
+* A HEAD error other than 404 on the first check raises: the message is released, never deleted. An error in the watcher's once-a-minute check is only logged; the check before the upload decides.
+* A clip finished under a Spot notice is dropped and the job released; another worker redoes it.
+* A message with no usable `job_id` or `sub` is deleted and logged (nobody to tell). A job the manifest now refuses (the manifest changed since submission) gets a `.failed` marker with code `invalid_request`.
+* Failing to turn scale-in protection on is logged and the job runs anyway.
+* `generator.py` is the interface; `wan.py` is the Wan 2.1 implementation (unverified until the Kaggle spike); tests use a fake. `lambdas/common/` (manifest checks, request rules, usage log) is shared with the API.
+* Entry point: `python -m worker` (`__main__.py`). The model is loaded once at start, before the first receive.
 
 ```python
 # Pseudo-code for the containerized worker (illustrative only)
@@ -312,7 +323,7 @@ Decided:
 Pre-deploy checklist:
 
 * **Test doubles:** moto for AWS calls in pytest. Spike done 2026-11-16 (moto 5.2.5, boto3 1.44.3): moto accepts a pre-signed POST upload, supports `ChangeMessageVisibility(0)` redelivery with `ApproximateReceiveCount`, redrive to a DLQ, and returns 404 on a HEAD of a missing key. It does **not** enforce the POST policy's `content-length-range` (a 50-byte upload against a 5-byte limit returns 204). So API tests assert the generated policy's conditions (decode `fields["policy"]`), not S3 enforcement. moto also cannot show the 403-without-`ListBucket` behaviour, so that rule is checked in the Terraform IAM review, not by tests. No hand-written fake is needed.
-* **Worker CUDA base image:** chosen to match the NVIDIA driver on the deployed ECS GPU AMI, and pinned by digest. Re-check the match whenever the AMI changes.
+* **Worker image (decided 2026-11-18, not built yet):** `python:3.12-slim-bookworm` plus the PyPI `torch==2.8.0` wheel, which carries its own CUDA 12.8 libraries; the image needs only the NVIDIA driver that the ECS GPU AMI provides (`NVIDIA_DRIVER_CAPABILITIES=compute,utility`). No CUDA base image, so there is no digest to pin. Re-check that the AMI's driver supports CUDA 12.8 whenever the AMI changes (the launch template takes the latest recommended AMI). Top-level Python packages are pinned exactly in `worker/requirements.txt`; `diffusers` stays at 0.35.x or older.
 * **JWT verification:** the API Gateway JWT authorizer verifies the token. The Lambda takes `sub` from the claims and does not re-verify. The Lambda must have no public function URL, and its resource policy allows only API Gateway. A test asserts that a request with no claims is rejected.
 * **Single environment:** one deployment, no dev or staging stack. Risky changes are planned windows. Add a `dev` stack later if needed.
 * **Terraform state bootstrap:** the state bucket is created once by hand in CloudShell (private, public access blocked, versioning on, default encryption), like the models bucket. There is no `bootstrap/` Terraform directory and no DynamoDB table: the S3 backend locks with `use_lockfile = true` (Terraform `>= 1.10`). Exact steps, verification and recovery are in `human_todo/aws_setup.md`. The bucket is never managed by Terraform.
