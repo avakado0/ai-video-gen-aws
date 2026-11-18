@@ -55,7 +55,10 @@ docs/
   architecture/DRAFT_architecture.md   Architecture spec (source of truth)
   huggingFace_to_s3_instructions.md    Runbook: copy model weights from Hugging Face to S3
 System_Diagrams/                       draw.io diagrams (FINAL is current)
-terraform/                             In progress: backend, provider, variables so far
+terraform/                             The AWS stack (deployed 2026-11-18)
+lambdas/                               API, failure-marker and budget cut-off Lambdas
+scripts/build_api.sh                   Builds the API Lambda bundle
+model_manifest.json                    What the model accepts; drives the form and the API checks
 frontend/                              Static web app (vanilla JS, mock mode)
 ```
 
@@ -78,9 +81,12 @@ frontend/                              Static web app (vanilla JS, mock mode)
 From `terraform/`, with `export AWS_PROFILE=terraform-deployer` (check `aws sts get-caller-identity` shows the right account):
 
 ```bash
+cd .. && ./scripts/build_api.sh && cd terraform   # only when lambdas/api/ or requirements-api.txt changed
 terraform plan -out=tfplan
 terraform apply tfplan
 ```
+
+`build_api.sh` installs the API's dependencies (FastAPI, Mangum) for the Lambda runtime into the git-ignored `build/api/`, and Terraform zips that folder. Skip it and `terraform plan` stops with an "archive" error, or ships an old API.
 
 After a front-end change, clear the CloudFront cache, or browsers can get the old files for a while (two cache layers, not just the 5-minute TTL). Up to 1,000 paths a month are free:
 
