@@ -71,7 +71,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 ## Phase 6: Upgrade and quota (the critical path)
 
-- [ ] H. Manually upgrade to Paid. One-way. Gate: Credits page still shows `10069756528`, expiry 2027-10-29. Only after phases 3-5 (decision 2026-11-16).
+- [ ] H. Manually upgrade to Paid. One-way. Gate: the Credits page still shows the $100 credit, expiry 2027-10-29. Only after phases 3-5 (decision 2026-11-16).
 - [x] H. Request the Spot quota "All G and VT Spot Instance Requests" in us-west-2: 8 vCPU (one `g4dn.2xlarge`, decision 2026-11-18). Requested 2026-11-20 before the upgrade, status Pending, no Support case yet; the applied value was 0.
 - [ ] H. Wait for approval. Do not raise the ASG max size before it.
 
@@ -87,4 +87,4 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 ## Off-path human items
 
 - [ ] H. Update the draw.io diagram: input-upload path, SNS and Budgets (`human_todo/update_diagram.md`).
-- [ ] H. Decide whether to close the idle account `308374654798` after the models migration works.
+- [ ] H. Decide whether to close the idle second account after the models migration works.
