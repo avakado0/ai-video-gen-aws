@@ -59,7 +59,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 ## Phase 4: Weights and image
 
-- [ ] H. Run the models runbook on an `m7i-flex.large`: create the models bucket (done early 2026-11-17, empty), copy weights, verify the byte count, tear down the temporary role, key, security group and instance. Expect a fix or two.
+- [x] H. Run the models runbook on an `m7i-flex.large`: create the models bucket (done early 2026-11-17, empty), copy weights, verify the byte count, tear down the temporary role, key, security group and instance. Expect a fix or two. Done 2026-11-20: 22 objects, 28,929,158,777 bytes, local and S3 match; download 3.5 min; temporary instance, volume, key, security group and role all deleted. Fix found: `hf download` needs one `--exclude` per pattern.
 - [x] C. Write `scripts/build_push.sh`. Done 2026-11-18, with `worker/Dockerfile` and pinned `worker/requirements.txt`. The CUDA base image idea was dropped: `python:3.12-slim` plus the `torch` wheel (bundles CUDA 12.8), so there is no digest to pin. Recipe is checked by tests; the image itself is not built yet and its dependency set resolves only at build time.
 - [x] H. Build and push the worker image. Done 2026-11-20: 4.16 GB compressed in ECR (verified with describe-images), build 19 min. Built, not yet run.
 

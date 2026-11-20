@@ -191,9 +191,11 @@ The v1 model is **Wan 2.1 T2V 1.3B in Diffusers format**, repo `Wan-AI/Wan2.1-T2
 ```bash
 hf download "$HF_REPO" \
   --revision "$HF_SHA" \
-  --exclude "assets/*" "examples/*" "*.md" "*.txt" \
+  --exclude "assets/*" --exclude "examples/*" --exclude "*.md" --exclude "*.txt" \
   --local-dir /data/model
 ```
+
+Repeat `--exclude` once per pattern. Listing several patterns after one `--exclude` makes the CLI treat the extra ones as file names, ignore the filter and fetch only 2 small files (found 2026-11-20).
 
 For a different model, change the repo ID, SHA and exclude patterns, and re-check the file list.
 
