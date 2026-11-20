@@ -47,7 +47,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 - [x] C. Worker: poll, skip a job whose `.pending` marker is gone (delete the message, no GPU work), heartbeat, release on SIGTERM and Spot notice, `.failed` fast path, delete message after upload, usage log line per attempt. Tests with fake SQS/S3, no GPU. Also (decided 2026-11-18): re-HEAD the marker at every heartbeat and between diffusion steps, and once before the upload; marker gone = cancelled, so abort, delete the message and inputs, upload nothing, log `outcome: cancelled`. Done 2026-11-18 (code and tests, nothing run on a GPU): `worker/` package, plan in `_plans/02_gpu_worker.md`, 87 worker tests (257 in the suite) with moto and a fake generator. `ecs.tf` now passes `MODEL_MANIFEST` and `AWS_DEFAULT_REGION` (validate only, not applied). `WanGenerator` is written but unverified until the Kaggle spike.
 - [x] C. Front end cancel and confirm (2026-11-18): Cancel button on pending jobs (`jobs.js`), confirmation dialog before submit (`confirm.js`), and a 30-second undo window in the API (`SUBMIT_DELAY_SECONDS`). Deployed and checked on the live site 2026-11-18 (apply 1 added, 5 changed).
 - [ ] C. Front end: show elapsed time and the "up to 20 minutes after idle" note on pending jobs (`frontend/js/jobs.js`). Tests in mock mode.
-- [ ] C. CI: GitHub Actions running pytest, `terraform fmt -check`, `terraform validate`, no AWS credentials.
+- [x] C. CI: GitHub Actions running pytest, `terraform fmt -check`, `terraform validate`, no AWS credentials. Written 2026-11-20 as `.github/workflows/ci.yml`; checked in a clean local clone (275 passed, fmt ok, validate ok). Not yet seen running on GitHub: it runs on the first push.
 
 ## Phase 3: First deploy at `gpu_max = 0`
 
