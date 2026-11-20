@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate spike/wan_speed.ipynb, the second Kaggle T4 notebook: why is a clip so slow, and what helps?
+"""Generate spike/wan_t4_speed_spike.ipynb, the second Kaggle T4 notebook: why is a clip so slow, and what helps?
 
 First spike: 25.5 s per denoising step (3 s clip). Only measures time per step and peak VRAM for
 a handful of variants, with 5 steps each. Setup cells are shared with make_spike_notebook.py, so the
@@ -121,6 +121,6 @@ def build():
 
 
 if __name__ == "__main__":
-    out = ROOT / "spike" / "wan_speed.ipynb"
+    out = ROOT / "spike" / "wan_t4_speed_spike.ipynb"
     out.write_text(json.dumps(build(), indent=1) + "\n")
     print(f"wrote {out}")

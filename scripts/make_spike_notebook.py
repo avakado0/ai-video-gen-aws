@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generate spike/wan_spike.ipynb, the Kaggle T4 notebook that checks the worker's model code.
+"""Generate spike/wan_t4_quality_spike.ipynb, the Kaggle T4 notebook that checks the worker's model code.
 
 The notebook embeds worker/wan.py and worker/errors.py as they are now and installs the pins from
 worker/requirements.txt (minus torch, which Kaggle ships, and boto3, which the spike does not
@@ -255,7 +255,7 @@ def build():
 
 
 if __name__ == "__main__":
-    out = ROOT / "spike" / "wan_spike.ipynb"
+    out = ROOT / "spike" / "wan_t4_quality_spike.ipynb"
     out.parent.mkdir(exist_ok=True)
     out.write_text(json.dumps(build(), indent=1) + "\n")
     print(f"wrote {out}")
