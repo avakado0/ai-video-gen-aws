@@ -30,7 +30,7 @@ Diffusers skips its own cleanup when an exception leaves the pipeline, so the tr
 Fixed in `b539a62`: on abort the generator drops the traceback, calls `maybe_free_model_hooks()`, `gc.collect()` and `torch.cuda.empty_cache()`. A unit test with a fake torch pins the call order. **Confirmed on a real GPU** (second Kaggle run, 2026-11-20, `~/Downloads/wan-spike-v2-ipynb.ipynb`): abort stopped 2.0 s after the flag with 0.0 GiB held afterwards (was 2.7 GiB), and the seeds cell then ran without out of memory.
 
 ## Still open
-- Speed: 15 min for 3 s and 39 min for 5 s are long. The transformer is about 2.7 GiB in fp16, so running without `enable_model_cpu_offload` (or offloading only the text encoder) may be much faster. Needs its own spike run. Estimates only until measured.
+- Speed: 15 min for 3 s and 39 min for 5 s are long. First guess was that `enable_model_cpu_offload` is the cost, but it moves each component once per call, not once per step, so the 25.5 s per step is probably real compute (about 20k tokens of attention per 3 s clip, two passes per step with guidance). Second spike, `spike/wan_speed.ipynb`, times 5 steps for: baseline, 640x368, no guidance, and a resident transformer. Estimates only until it runs.
 - Default steps (20 vs 30), whether to keep the 5 s option, and the `flow_shift` value: decide after the speed spike. Only one prompt was compared for 20 vs 30 steps.
 - A 5 s clip with more motion in the prompt, to tell a weak sample from a weak long-clip result.
 - Kaggle RAM is 31.3 GiB against 32 on a g4dn.2xlarge, so a pass here is slightly conservative.
