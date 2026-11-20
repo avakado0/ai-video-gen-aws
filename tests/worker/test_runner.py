@@ -136,7 +136,13 @@ def test_generator_gets_the_checked_job(env):
     env.submit(params={"seed": 5}, prompt="  a cat  ")
     env.run_one()
     job = env.generator.calls[0]
-    assert job.prompt == "a cat" and job.params == {"seed": 5, "duration_seconds": "3", "negative_prompt": ""}
+    assert job.prompt == "a cat" and job.params == {"seed": 5, "duration_seconds": "3", "quality": "fast", "negative_prompt": ""}
+
+
+def test_usage_line_names_the_quality_level(env):
+    env.submit(params={"quality": "high"})
+    env.run_one()
+    assert env.usage[0]["quality"] == "high"
 
 
 def test_one_usage_line_per_attempt(env):

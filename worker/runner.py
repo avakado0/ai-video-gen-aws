@@ -59,7 +59,8 @@ class Worker:
             self._release(message)
         finally:
             self.log_usage("job_attempt", sub=job.sub, job_id=job.job_id, attempt=job.receive_count,
-                           instance_type=self.instance_type(), gpu_seconds=round(self.clock() - started, 1), outcome=outcome)
+                           instance_type=self.instance_type(), quality=job.params.get("quality"),
+                           gpu_seconds=round(self.clock() - started, 1), outcome=outcome)
         return outcome
 
     # --- one attempt ---------------------------------------------------------------
