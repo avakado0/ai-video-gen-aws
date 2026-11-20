@@ -47,7 +47,7 @@ Executed copy: `~/Downloads/wan-t4-speed-spike-ipynb.ipynb`. Sheet: `docs/spike_
 - 5 s at 640x368 is not measured. By the 2.6x ratio I'd expect about 12 minutes (my estimate).
 
 ## Still open
-- Defaults to decide (owner): resolution (832x480 or 640x368), steps (20 or 30), whether to keep the 5 s option. The `flow_shift` value stays 3.0 unless a clip looks wrong. Only one prompt was compared for each.
+- Decided 2026-11-20 (owner): ship two levels as a manifest param `quality`: `fast` (640x368, 20 steps, default) and `high` (832x480, 30 steps). The 5 s option stays. `flow_shift` stays 3.0. Only one prompt was compared for each level; `fast` quality beyond one sample is unchecked. Plan: `_plans/03_quality_option.md`.
 - A 5 s clip with more motion in the prompt, to tell a weak sample from a weak long-clip result.
 - Kaggle RAM is 31.3 GiB against 32 on a g4dn.2xlarge, so a pass here is slightly conservative.
 - Everything on the real instance (IMDS, task protection, cold start, S3) is unchanged and still unverified.

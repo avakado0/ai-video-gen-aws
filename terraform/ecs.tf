@@ -85,7 +85,7 @@ resource "aws_cloudwatch_query_definition" "usage_per_user" {
   query_string = <<-EOT
     fields @timestamp
     | filter event in ["job_attempt", "download", "inputs"]
-    | stats sum(gpu_seconds) as gpu_seconds, sum(bytes) as bytes, count(*) as events by sub, instance_type
+    | stats sum(gpu_seconds) as gpu_seconds, sum(bytes) as bytes, count(*) as events by sub, instance_type, quality
     | sort gpu_seconds desc
   EOT
 }

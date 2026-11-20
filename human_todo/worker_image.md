@@ -10,3 +10,5 @@ The worker code, tests and Dockerfile are written (`_plans/02_gpu_worker.md`). N
 
 ## Speed spike (optional, free, about 30 minutes)
 Same Kaggle setup as above (GPU T4 x2, Internet On). Upload `spike/wan_t4_speed_spike.ipynb`, run the cells one at a time with Shift+Enter (not Run all), paste the SPEED REPORT back. The last cell is optional.
+
+The `ecs.tf` apply now also changes the saved usage query (adds `quality`). Same `terraform plan` / `apply`, same profile reminder.
