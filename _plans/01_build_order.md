@@ -61,7 +61,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 - [ ] H. Run the models runbook on an `m7i-flex.large`: create the models bucket (done early 2026-11-17, empty), copy weights, verify the byte count, tear down the temporary role, key, security group and instance. Expect a fix or two.
 - [x] C. Write `scripts/build_push.sh`. Done 2026-11-18, with `worker/Dockerfile` and pinned `worker/requirements.txt`. The CUDA base image idea was dropped: `python:3.12-slim` plus the `torch` wheel (bundles CUDA 12.8), so there is no digest to pin. Recipe is checked by tests; the image itself is not built yet and its dependency set resolves only at build time.
-- [ ] H. Build and push the worker image (about 15-25 GB free disk, 6-10 GB push).
+- [x] H. Build and push the worker image. Done 2026-11-20: 4.16 GB compressed in ECR (verified with describe-images), build 19 min. Built, not yet run.
 
 ## Phase 5: GPU spike (before the first real job)
 
