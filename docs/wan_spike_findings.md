@@ -29,9 +29,25 @@ Setup under test: `diffusers.WanPipeline`, fp16 transformer and text encoder, fp
 Diffusers skips its own cleanup when an exception leaves the pipeline, so the transformer stayed on the GPU (2.7 GiB held) and the next generation ran out of memory. In production the first cancelled job would have broken every later job on that instance.
 Fixed in `b539a62`: on abort the generator drops the traceback, calls `maybe_free_model_hooks()`, `gc.collect()` and `torch.cuda.empty_cache()`. A unit test with a fake torch pins the call order. **Confirmed on a real GPU** (second Kaggle run, 2026-11-20, `~/Downloads/wan-spike-v2-ipynb.ipynb`): abort stopped 2.0 s after the flag with 0.0 GiB held afterwards (was 2.7 GiB), and the seeds cell then ran without out of memory.
 
+## Speed spike (2026-11-20, `wan_t4_speed_spike.ipynb`, 5 steps each, 3 s clip)
+Executed copy: `~/Downloads/wan-t4-speed-spike-ipynb.ipynb`. Sheet: `docs/spike_images/clip-640x368-20steps.png`.
+
+| Variant | Seconds per step | Total for 5 steps | Peak VRAM |
+|---|---|---|---|
+| A baseline: 832x480, guidance, model cpu offload | 23.7 | 254 s | 12.7 GiB |
+| B 640x368, guidance | 11.0 (2.2x faster) | 130 s | 12.7 GiB |
+| C 832x480, no guidance | 13.3 (1.8x faster) | 182 s | 12.7 GiB |
+| D transformer and VAE resident on GPU | FAIL | | `NotImplementedError: aten::slow_conv3d_forward` on CUDA. Not chased. |
+| E 640x368, 20 steps | 10.4 | 284 s for the whole clip | 12.7 GiB |
+
+- **Resolution is the lever.** 640x368 halves the time per step, so a 3 s clip at 20 steps takes about 4.7 minutes (284 s) instead of 10.5 minutes (632 s at 832x480). About 75 s of that is fixed (text encoding, VAE decode).
+- **Guidance is the second lever** but I would not drop it: Wan 1.3B is built to run with it. Quality unchecked.
+- **Offload was not the cost,** as suspected. Peak VRAM is 12.7 GiB in every variant, because the text encoder phase sets the peak, not the transformer. D failed for a reason I have not found, and since offload is not the bottleneck I'm leaving it.
+- **Quality at 640x368, 20 steps (one sample, by eye):** a real cat in a garden, correct motion, sharp enough. Softer than the 832x480 clips, and in one frame the head is smeared by motion. Acceptable for a friends-only tool, not great.
+- 5 s at 640x368 is not measured. By the 2.6x ratio I'd expect about 12 minutes (my estimate).
+
 ## Still open
-- Speed: 15 min for 3 s and 39 min for 5 s are long. First guess was that `enable_model_cpu_offload` is the cost, but it moves each component once per call, not once per step, so the 25.5 s per step is probably real compute (about 20k tokens of attention per 3 s clip, two passes per step with guidance). Second spike, `spike/wan_t4_speed_spike.ipynb`, times 5 steps for: baseline, 640x368, no guidance, and a resident transformer. Estimates only until it runs.
-- Default steps (20 vs 30), whether to keep the 5 s option, and the `flow_shift` value: decide after the speed spike. Only one prompt was compared for 20 vs 30 steps.
+- Defaults to decide (owner): resolution (832x480 or 640x368), steps (20 or 30), whether to keep the 5 s option. The `flow_shift` value stays 3.0 unless a clip looks wrong. Only one prompt was compared for each.
 - A 5 s clip with more motion in the prompt, to tell a weak sample from a weak long-clip result.
 - Kaggle RAM is 31.3 GiB against 32 on a g4dn.2xlarge, so a pass here is slightly conservative.
 - Everything on the real instance (IMDS, task protection, cold start, S3) is unchanged and still unverified.
