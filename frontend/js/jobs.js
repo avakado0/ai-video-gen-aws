@@ -1,4 +1,5 @@
 /** Job list: renders GET /jobs and polls pending jobs until they settle. */
+import { pendingNote } from './elapsed.js';
 
 export class JobList {
   /**
@@ -52,6 +53,12 @@ export class JobList {
     status.className = 'badge';
     status.textContent = job.status === 'pending' ? 'Generating…' : job.status === 'ready' ? 'Ready' : 'Failed';
     li.append(status, title);
+    if (job.status === 'pending') {
+      const note = document.createElement('p');
+      note.className = 'muted job-note';
+      note.textContent = pendingNote(job.created);
+      li.append(note);
+    }
 
     if (job.status === 'ready' && job.url) {
       const video = Object.assign(document.createElement('video'), { src: job.url, controls: true, preload: 'metadata' });
