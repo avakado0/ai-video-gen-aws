@@ -34,17 +34,18 @@ def test_v1_manifest_is_valid():
     assert manifest.validate(load_v1()) == []
 
 
-def test_v1_is_text_to_video_with_three_params():
+def test_v1_is_text_to_video_with_four_params():
     m = load_v1()
     assert m.get("prompt", "required") == "required"
     assert m["inputs"] == []
-    assert [p["name"] for p in m["params"]] == ["seed", "duration_seconds", "negative_prompt"]
+    assert [p["name"] for p in m["params"]] == ["seed", "duration_seconds", "quality", "negative_prompt"]
 
 
 def test_v1_param_details():
     p = {x["name"]: x for x in load_v1()["params"]}
     assert p["seed"]["type"] == "int" and "default" not in p["seed"]
     assert p["duration_seconds"]["type"] == "enum" and p["duration_seconds"]["values"] == ["3", "5"]
+    assert p["quality"]["type"] == "enum" and p["quality"]["values"] == ["fast", "high"] and p["quality"]["default"] == "fast"
     assert p["negative_prompt"]["type"] == "string" and p["negative_prompt"]["max_chars"] == 200
     assert p["negative_prompt"]["default"] == ""
 

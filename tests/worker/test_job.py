@@ -48,6 +48,7 @@ def test_checked_fills_defaults_and_trims_the_prompt():
     job = Job.from_message(body(prompt="  a cat  "), receive_count=1).checked(MANIFEST)
     assert job.prompt == "a cat"
     assert job.params["duration_seconds"] == "3"
+    assert job.params["quality"] == "fast"
 
 
 def test_checked_clamps_numbers_like_the_api_does():
@@ -61,6 +62,13 @@ def test_job_the_manifest_refuses_is_a_permanent_error_with_a_user_message():
         job.checked(MANIFEST)
     assert err.value.code == "invalid_request"
     assert "duration_seconds" in err.value.message
+
+
+def test_unknown_quality_is_a_permanent_error():
+    job = Job.from_message(body(params={"quality": "ultra"}), receive_count=1)
+    with pytest.raises(PermanentJobError) as err:
+        job.checked(MANIFEST)
+    assert err.value.code == "invalid_request" and "quality" in err.value.message
 
 
 def test_permanent_error_json_has_only_the_documented_fields():

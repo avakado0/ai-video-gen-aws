@@ -70,7 +70,7 @@ def test_text_only_model_needs_no_job_id_or_inputs(call, aws, use_manifest):
     job_id = res.json()["job_id"]
     assert str(uuid.UUID(job_id)) == job_id
     [msg] = queued(aws)
-    assert msg["params"] == {"duration_seconds": "5", "negative_prompt": ""}  # seed unset: left out
+    assert msg["params"] == {"duration_seconds": "5", "quality": "fast", "negative_prompt": ""}  # seed unset: left out
 
 
 def test_the_sub_in_the_marker_and_message_comes_from_the_claims(call, aws, put_input):

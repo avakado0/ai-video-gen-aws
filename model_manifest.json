@@ -19,6 +19,12 @@
       "values": ["3", "5"]
     },
     {
+      "name": "quality",
+      "type": "enum",
+      "default": "fast",
+      "values": ["fast", "high"]
+    },
+    {
       "name": "negative_prompt",
       "type": "string",
       "default": "",
