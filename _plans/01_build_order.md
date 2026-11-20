@@ -72,7 +72,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 ## Phase 6: Upgrade and quota (the critical path)
 
 - [ ] H. Manually upgrade to Paid. One-way. Gate: Credits page still shows `10069756528`, expiry 2027-10-29. Only after phases 3-5 (decision 2026-11-16).
-- [ ] H. Request the Spot quota "All G and VT Spot Instance Requests" in us-west-2: 16 vCPU.
+- [x] H. Request the Spot quota "All G and VT Spot Instance Requests" in us-west-2: 8 vCPU (one `g4dn.2xlarge`, decision 2026-11-18). Requested 2026-11-20 before the upgrade, status Pending, no Support case yet; the applied value was 0.
 - [ ] H. Wait for approval. Do not raise the ASG max size before it.
 
 ## Phase 7: GPU go-live
