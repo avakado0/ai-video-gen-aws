@@ -7,6 +7,7 @@ below (steps, guidance, flow_shift) as the documented defaults, not measured one
 torch and diffusers are imported inside methods, so the rest of the worker (and its tests)
 load without them.
 """
+import gc
 import pathlib
 import random
 
@@ -47,6 +48,28 @@ class WanGenerator:
         self.pipe = pipe
 
     def generate(self, job, inputs, should_abort, out_dir):
+        error = None
+        try:
+            return self._generate(job, should_abort, out_dir)
+        except Aborted as e:
+            # The traceback holds the pipeline's tensors, so drop it before freeing memory.
+            error = e.with_traceback(None)
+        finally:
+            if error is None:
+                self._free()
+        self._free()
+        raise error
+
+    def _free(self):
+        """An abort skips diffusers' own cleanup: the transformer stayed on the GPU and the next
+        job ran out of memory (Kaggle spike). Put the model back on the CPU and drop the cache."""
+        import torch
+
+        self.pipe.maybe_free_model_hooks()
+        gc.collect()
+        torch.cuda.empty_cache()
+
+    def _generate(self, job, should_abort, out_dir):
         import torch
         from diffusers.utils import export_to_video
 
@@ -59,19 +82,16 @@ class WanGenerator:
             return callback_kwargs
 
         seed = pick_seed(job.params)
-        try:
-            frames = self.pipe(
-                prompt=job.prompt,
-                negative_prompt=job.params.get("negative_prompt") or None,
-                width=WIDTH, height=HEIGHT,
-                num_frames=num_frames(job.params["duration_seconds"]),
-                num_inference_steps=self.steps,
-                guidance_scale=GUIDANCE_SCALE,
-                generator=torch.Generator("cpu").manual_seed(seed),
-                callback_on_step_end=on_step,
-            ).frames[0]
-            out = pathlib.Path(out_dir) / "clip.mp4"
-            export_to_video(frames, str(out), fps=FPS)
-            return out
-        finally:
-            torch.cuda.empty_cache()
+        frames = self.pipe(
+            prompt=job.prompt,
+            negative_prompt=job.params.get("negative_prompt") or None,
+            width=WIDTH, height=HEIGHT,
+            num_frames=num_frames(job.params["duration_seconds"]),
+            num_inference_steps=self.steps,
+            guidance_scale=GUIDANCE_SCALE,
+            generator=torch.Generator("cpu").manual_seed(seed),
+            callback_on_step_end=on_step,
+        ).frames[0]
+        out = pathlib.Path(out_dir) / "clip.mp4"
+        export_to_video(frames, str(out), fps=FPS)
+        return out
