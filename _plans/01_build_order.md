@@ -20,24 +20,24 @@ Steps are in `human_todo/aws_setup.md`.
 - [x] H. Keep `the-admin-user` console-only with MFA and no key.
 - [x] H. Create the Terraform state bucket in CloudShell and run the four verify commands. Check `terraform version` is 1.10 or newer. Gate: `terraform init` succeeds with the existing `backend.tf`. Progress 2026-11-17: bucket `aivideogen-tfstate-477656043770` created and verified, Terraform v1.15.8. `terraform init -reconfigure` succeeded with the S3 backend (gate met).
 - [ ] H. Verify the Free plan end date in the console and write it in `human_todo/aws_setup.md`.
-- [ ] H. Free 25 GB of disk. Make a Kaggle account with phone verification.
+- [x] H. Free 25 GB of disk. Make a Kaggle account with phone verification. Done: Kaggle spike ran 2026-11-20, worker image built locally.
 
 ## Phase 1: Free Terraform, validate only
 
 Order follows resource dependencies. Gate for every file: `terraform fmt -check` and `terraform validate`; a reviewed `plan` once the profile works. No apply until phase 3.
 
-- [ ] C. `vpc.tf`: VPC, two public subnets, Internet Gateway, route table, S3 Gateway Endpoint (ADR 0002).
-- [ ] C. `storage.tf`: clips bucket, 1-day lifecycle on `clips/` and `inputs/`, read-only `data` lookup of the models bucket. Written, validate passes. The clips-bucket CORS resource is in `cloudfront.tf`, because its origin is the distribution domain.
-- [ ] C. `sqs.tf`: queue (1 day since 2026-11-17, was 4 days; 3 min visibility, `maxReceiveCount = 8`), DLQ, DLQ alarm, SNS topic and email subscription. Written, validate passes. Needs `alert_email` in a git-ignored `.tfvars` before `plan`.
-- [ ] C. `ecr.tf`: repository. Written, validate passes. Keeps the latest 3 images; tags are mutable, so `build_push.sh` may reuse a tag.
-- [ ] C. `iam.tf`: instance profile, task role, execution role, API role (with `s3:ListBucket`), failure Lambda role. Written, validate passes. The budget Lambda role lives in `budget.tf` (spec 3G).
-- [ ] C. `failure.tf`: DLQ-triggered marker Lambda (test the handler first, TDD). Written: 22 tests pass (`.venv/bin/pytest`), validate passes, zip checked in a scratch copy.
-- [ ] C. `budget.tf`: SNS topic with a `budgets.amazonaws.com` publish policy, cut-off Lambda, subscription (ADR 0004). Test the handler first. Written: handler tests and validate pass. Amended 2026-11-17: also zeroes the ECS service and its autoscaling max (14 handler tests), because zeroing the ASG alone cannot stop a protected instance. The budget's own 100% alert still has to be pointed at this topic by hand after the first apply.
-- [ ] C. `cloudfront.tf`: web bucket, distribution, then bucket policy as a separate resource. Written, validate passes. The clips-bucket CORS resource (browser `POST`/`GET`/`HEAD` from the distribution origin) and the upload of `frontend/` (minus the mock `config.json`) are in this file too.
-- [ ] C. `cognito.tf`: user pool (admin-create-only), public PKCE client, prefix domain, callback from the distribution's `domain_name`. Written, validate passes.
-- [ ] C. `api.tf`: HTTP API, JWT authorizer, Lambda with no function URL, resource policy for API Gateway only, log group (90 days). Written with a placeholder handler (`lambdas/api/`, returns 501); validate passes. Still to do in phase 2: the real FastAPI app, a dependency-packaging method for the zip (`archive_file` cannot `pip install`), and the `model_manifest.json` env var.
-- [ ] C. `ecs.tf`, `compute.tf`, `scaling.tf`: cluster, capacity provider, task definition, launch template, ASG (`gpu_max`, `ignore_changes` on `max_size`), scaling alarms and policies, worker log group, saved Logs Insights query. Written (service in `ecs.tf`), validate passes. Untested until the first GPU boot: `aws` CLI on the AMI, agent starts after `user_data`, Spot service-linked role (if the first launch fails on it, run `aws iam create-service-linked-role --aws-service-name spot.amazonaws.com`).
-- [ ] C. `outputs.tf`, and `config.json` upload last (generated in memory, never to disk). Written, validate passes. All 17 Terraform files now exist; none has been planned or applied.
+- [x] C. `vpc.tf`: VPC, two public subnets, Internet Gateway, route table, S3 Gateway Endpoint (ADR 0002).
+- [x] C. `storage.tf`: clips bucket, 1-day lifecycle on `clips/` and `inputs/`, read-only `data` lookup of the models bucket. Written, validate passes. The clips-bucket CORS resource is in `cloudfront.tf`, because its origin is the distribution domain.
+- [x] C. `sqs.tf`: queue (1 day since 2026-11-17, was 4 days; 3 min visibility, `maxReceiveCount = 8`), DLQ, DLQ alarm, SNS topic and email subscription. Written, validate passes. Needs `alert_email` in a git-ignored `.tfvars` before `plan`.
+- [x] C. `ecr.tf`: repository. Written, validate passes. Keeps the latest 3 images; tags are mutable, so `build_push.sh` may reuse a tag.
+- [x] C. `iam.tf`: instance profile, task role, execution role, API role (with `s3:ListBucket`), failure Lambda role. Written, validate passes. The budget Lambda role lives in `budget.tf` (spec 3G).
+- [x] C. `failure.tf`: DLQ-triggered marker Lambda (test the handler first, TDD). Written: 22 tests pass (`.venv/bin/pytest`), validate passes, zip checked in a scratch copy.
+- [x] C. `budget.tf`: SNS topic with a `budgets.amazonaws.com` publish policy, cut-off Lambda, subscription (ADR 0004). Test the handler first. Written: handler tests and validate pass. Amended 2026-11-17: also zeroes the ECS service and its autoscaling max (14 handler tests), because zeroing the ASG alone cannot stop a protected instance. The budget's own 100% alert still has to be pointed at this topic by hand after the first apply.
+- [x] C. `cloudfront.tf`: web bucket, distribution, then bucket policy as a separate resource. Written, validate passes. The clips-bucket CORS resource (browser `POST`/`GET`/`HEAD` from the distribution origin) and the upload of `frontend/` (minus the mock `config.json`) are in this file too.
+- [x] C. `cognito.tf`: user pool (admin-create-only), public PKCE client, prefix domain, callback from the distribution's `domain_name`. Written, validate passes.
+- [x] C. `api.tf`: HTTP API, JWT authorizer, Lambda with no function URL, resource policy for API Gateway only, log group (90 days). Written with a placeholder handler (`lambdas/api/`, returns 501); validate passes. Still to do in phase 2: the real FastAPI app, a dependency-packaging method for the zip (`archive_file` cannot `pip install`), and the `model_manifest.json` env var.
+- [x] C. `ecs.tf`, `compute.tf`, `scaling.tf`: cluster, capacity provider, task definition, launch template, ASG (`gpu_max`, `ignore_changes` on `max_size`), scaling alarms and policies, worker log group, saved Logs Insights query. Written (service in `ecs.tf`), validate passes. Untested until the first GPU boot: `aws` CLI on the AMI, agent starts after `user_data`, Spot service-linked role (if the first launch fails on it, run `aws iam create-service-linked-role --aws-service-name spot.amazonaws.com`).
+- [x] C. `outputs.tf`, and `config.json` upload last (generated in memory, never to disk). Written, validate passes. All 17 Terraform files now exist. Applied 2026-11-18 (95 resources, `gpu_max = 0`); later changes applied 2026-11-20 (`ecs.tf`).
 
 ## Phase 2: Application code (TDD, in parallel with phase 1)
 
