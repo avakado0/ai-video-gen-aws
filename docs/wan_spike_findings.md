@@ -17,7 +17,7 @@ Setup under test: `diffusers.WanPipeline`, fp16 transformer and text encoder, fp
 | 3 s clip, 20 steps | INFO | 632 s (29% faster), looks as good. A different composition from the 30-step clip, as expected. One prompt only. |
 | 5 s clip, 30 steps | FAIL (my 900 s bar) | 81 frames, 2342 s (39 min), peak VRAM 12.7 GiB. No black frames, but motion 2.06: a big red balloon filling the frame, barely moving. Weak match to "floating up above a street". One sample. |
 | Abort between steps | PASS | Stopped at once. But 2.7 GiB stayed on the GPU afterwards (bug, below). |
-| Seeds | FAIL | CUDA out of memory, caused by the abort leak. Same-seed repeat and different-seed difference are still unmeasured. |
+| Seeds | FAIL, then PASS after the fix | First run: CUDA out of memory, caused by the abort leak. Re-run: same seed gives pixel difference 0.00 (exactly repeatable), a different seed 46.2. |
 
 ## What it answers
 - The model runs on a T4 with the chosen precision. No NaN, black or distorted frames at fp16 with an fp32 VAE.
@@ -27,10 +27,9 @@ Setup under test: `diffusers.WanPipeline`, fp16 transformer and text encoder, fp
 
 ## Bug found: abort left the GPU dirty
 Diffusers skips its own cleanup when an exception leaves the pipeline, so the transformer stayed on the GPU (2.7 GiB held) and the next generation ran out of memory. In production the first cancelled job would have broken every later job on that instance.
-Fixed in `b539a62`: on abort the generator drops the traceback, calls `maybe_free_model_hooks()`, `gc.collect()` and `torch.cuda.empty_cache()`. A unit test with a fake torch pins the call order. **Not yet confirmed on a real GPU.**
+Fixed in `b539a62`: on abort the generator drops the traceback, calls `maybe_free_model_hooks()`, `gc.collect()` and `torch.cuda.empty_cache()`. A unit test with a fake torch pins the call order. **Confirmed on a real GPU** (second Kaggle run, 2026-11-20, `~/Downloads/wan-spike-v2-ipynb.ipynb`): abort stopped 2.0 s after the flag with 0.0 GiB held afterwards (was 2.7 GiB), and the seeds cell then ran without out of memory.
 
 ## Still open
-- Confirm the abort fix on Kaggle (re-run abort, then seeds).
 - Speed: 15 min for 3 s and 39 min for 5 s are long. The transformer is about 2.7 GiB in fp16, so running without `enable_model_cpu_offload` (or offloading only the text encoder) may be much faster. Needs its own spike run. Estimates only until measured.
 - Default steps (20 vs 30), whether to keep the 5 s option, and the `flow_shift` value: decide after the speed spike. Only one prompt was compared for 20 vs 30 steps.
 - A 5 s clip with more motion in the prompt, to tell a weak sample from a weak long-clip result.
