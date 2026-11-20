@@ -1,0 +1,319 @@
+Acquiring state lock. This may take a few moments...
+data.archive_file.api: Reading...
+data.archive_file.budget_cutoff: Reading...
+data.archive_file.failure_marker: Reading...
+data.archive_file.budget_cutoff: Read complete after 0s [id=c527b80a163b4305db2633ee85eb2dcc766bea5b]
+data.archive_file.failure_marker: Read complete after 0s [id=a4c972c3e3d3cbc91e630d48630fd0d48a4fd2e1]
+data.archive_file.api: Read complete after 0s [id=97cfb57590894daae53d1c8c8f1500d8649113df]
+data.aws_ssm_parameter.ecs_gpu_ami: Reading...
+data.aws_iam_policy_document.trust_lambda: Reading...
+data.aws_s3_bucket.models: Reading...
+data.aws_iam_policy_document.trust_ec2: Reading...
+aws_cloudfront_origin_access_control.web: Refreshing state... [id=E335RPOXM868EO]
+aws_cloudwatch_log_group.worker: Refreshing state... [id=/aivideogen/worker]
+aws_cloudwatch_log_group.failure_marker: Refreshing state... [id=/aws/lambda/aivideogen-failure-marker]
+aws_vpc.main: Refreshing state... [id=vpc-013636c0a3d00cbe9]
+aws_sqs_queue.dlq: Refreshing state... [id=https://sqs.us-west-2.amazonaws.com/477656043770/aivideogen-jobs-dlq]
+data.aws_iam_policy_document.trust_ec2: Read complete after 0s [id=2851119427]
+data.aws_iam_policy_document.trust_lambda: Read complete after 0s [id=2690255455]
+aws_cognito_user_pool.main: Refreshing state... [id=us-west-2_Cirm2aHXF]
+aws_cloudwatch_log_group.api: Refreshing state... [id=/aws/lambda/aivideogen-api]
+data.aws_caller_identity.current: Reading...
+data.aws_caller_identity.current: Read complete after 0s [id=477656043770]
+aws_ecr_repository.worker: Refreshing state... [id=aivideogen-worker]
+aws_sns_topic.budget: Refreshing state... [id=arn:aws:sns:us-west-2:477656043770:aivideogen-budget-alert]
+data.aws_ssm_parameter.ecs_gpu_ami: Read complete after 1s [id=/aws/service/ecs/optimized-ami/amazon-linux-2023/gpu/recommended/image_id]
+data.aws_partition.current: Reading...
+data.aws_partition.current: Read complete after 0s [id=aws]
+aws_ecs_cluster.main: Refreshing state... [id=arn:aws:ecs:us-west-2:477656043770:cluster/aivideogen]
+aws_cloudfront_cache_policy.web: Refreshing state... [id=89da51c6-2454-4ab3-88e4-4451ac681db6]
+aws_sns_topic.alerts: Refreshing state... [id=arn:aws:sns:us-west-2:477656043770:aivideogen-alerts]
+aws_cloudwatch_log_group.budget_cutoff: Refreshing state... [id=/aws/lambda/aivideogen-budget-cutoff]
+aws_iam_role.api: Refreshing state... [id=aivideogen-api]
+data.aws_s3_bucket.models: Read complete after 1s [id=aivideogen-models-477656043770]
+aws_iam_role.instance: Refreshing state... [id=aivideogen-instance]
+aws_iam_role.budget: Refreshing state... [id=aivideogen-budget-cutoff]
+aws_iam_role.failure: Refreshing state... [id=aivideogen-failure-marker]
+aws_s3_bucket.clips: Refreshing state... [id=aivideogen-clips-477656043770]
+aws_sqs_queue.jobs: Refreshing state... [id=https://sqs.us-west-2.amazonaws.com/477656043770/aivideogen-jobs]
+aws_cloudwatch_query_definition.usage_per_user: Refreshing state... [id=19a71ee1-870a-4911-af4e-0cdf65740293]
+data.aws_iam_policy_document.instance_models: Reading...
+data.aws_iam_policy_document.instance_models: Read complete after 0s [id=3463519122]
+aws_ecr_lifecycle_policy.worker: Refreshing state... [id=aivideogen-worker]
+data.aws_iam_policy_document.trust_ecs_tasks: Reading...
+data.aws_iam_policy_document.trust_ecs_tasks: Read complete after 0s [id=1530459078]
+aws_s3_bucket.web: Refreshing state... [id=aivideogen-web-477656043770]
+data.aws_iam_policy_document.budget_topic: Reading...
+data.aws_iam_policy_document.budget_topic: Read complete after 0s [id=607622615]
+aws_cloudwatch_metric_alarm.dlq_not_empty: Refreshing state... [id=aivideogen-dlq-received]
+aws_sns_topic_subscription.alerts_email: Refreshing state... [id=arn:aws:sns:us-west-2:477656043770:aivideogen-alerts:8c1822ab-1d0d-4ead-94e6-0db8bffa9f3c]
+data.aws_iam_policy_document.budget: Reading...
+data.aws_iam_policy_document.budget: Read complete after 0s [id=2368652632]
+aws_iam_role.task: Refreshing state... [id=aivideogen-task]
+aws_iam_role.task_execution: Refreshing state... [id=aivideogen-task-execution]
+aws_sqs_queue_redrive_allow_policy.dlq: Refreshing state... [id=https://sqs.us-west-2.amazonaws.com/477656043770/aivideogen-jobs-dlq]
+aws_sns_topic_policy.budget: Refreshing state... [id=arn:aws:sns:us-west-2:477656043770:aivideogen-budget-alert]
+aws_route_table.public: Refreshing state... [id=rtb-08be6de184632101c]
+aws_internet_gateway.main: Refreshing state... [id=igw-0e2621dabc946a7d0]
+aws_security_group.instance: Refreshing state... [id=sg-0eb81edb2d166bc11]
+aws_subnet.public["us-west-2a"]: Refreshing state... [id=subnet-0eaea69eba4f174a7]
+aws_subnet.public["us-west-2b"]: Refreshing state... [id=subnet-0e88d5ef23ad51906]
+aws_iam_role_policy.instance_models: Refreshing state... [id=aivideogen-instance:read-models]
+aws_iam_role_policy_attachment.instance_ecs: Refreshing state... [id=aivideogen-instance-20261118142218766500000002]
+aws_iam_instance_profile.instance: Refreshing state... [id=aivideogen-instance]
+aws_iam_role_policy.budget: Refreshing state... [id=aivideogen-budget-cutoff:budget-cutoff]
+aws_cognito_user_pool_domain.main: Refreshing state... [id=aivideogen-477656043770]
+aws_vpc_endpoint.s3: Refreshing state... [id=vpce-0a830e1d1ca2bdffe]
+aws_iam_role_policy_attachment.task_execution: Refreshing state... [id=aivideogen-task-execution-20261118142217763100000001]
+aws_route.internet: Refreshing state... [id=r-rtb-08be6de184632101c1080289494]
+aws_lambda_function.budget_cutoff: Refreshing state... [id=aivideogen-budget-cutoff]
+aws_launch_template.gpu: Refreshing state... [id=lt-0174eafb0379d2ece]
+aws_route_table_association.public["us-west-2a"]: Refreshing state... [id=rtbassoc-0f6702ea5a2c475f7]
+aws_route_table_association.public["us-west-2b"]: Refreshing state... [id=rtbassoc-07b984e2ddd213ca9]
+aws_autoscaling_group.gpu: Refreshing state... [id=aivideogen-gpu]
+aws_lambda_permission.budget_from_sns: Refreshing state... [id=AllowSnsInvoke]
+aws_sns_topic_subscription.budget_cutoff: Refreshing state... [id=arn:aws:sns:us-west-2:477656043770:aivideogen-budget-alert:702b87f9-bc97-42a2-94a9-ea967b982738]
+aws_ecs_capacity_provider.gpu: Refreshing state... [id=arn:aws:ecs:us-west-2:477656043770:capacity-provider/aivideogen-gpu]
+aws_ecs_cluster_capacity_providers.main: Refreshing state... [id=aivideogen]
+aws_s3_bucket_public_access_block.clips: Refreshing state... [id=aivideogen-clips-477656043770]
+aws_s3_bucket_server_side_encryption_configuration.clips: Refreshing state... [id=aivideogen-clips-477656043770]
+data.aws_iam_policy_document.failure: Reading...
+aws_lambda_function.failure_marker: Refreshing state... [id=aivideogen-failure-marker]
+aws_s3_bucket_lifecycle_configuration.clips: Refreshing state... [id=aivideogen-clips-477656043770]
+data.aws_iam_policy_document.api: Reading...
+aws_ecs_task_definition.worker: Refreshing state... [id=aivideogen-worker]
+data.aws_iam_policy_document.task: Reading...
+data.aws_iam_policy_document.failure: Read complete after 0s [id=3227912596]
+data.aws_iam_policy_document.api: Read complete after 0s [id=3991241611]
+aws_iam_role_policy.failure: Refreshing state... [id=aivideogen-failure-marker:failure-marker]
+data.aws_iam_policy_document.task: Read complete after 0s [id=235912605]
+aws_iam_role_policy.api: Refreshing state... [id=aivideogen-api:api]
+aws_iam_role_policy.task: Refreshing state... [id=aivideogen-task:worker]
+aws_lambda_function.api: Refreshing state... [id=aivideogen-api]
+aws_ecs_service.worker: Refreshing state... [id=arn:aws:ecs:us-west-2:477656043770:service/aivideogen/aivideogen-worker]
+aws_s3_bucket_public_access_block.web: Refreshing state... [id=aivideogen-web-477656043770]
+aws_s3_bucket_server_side_encryption_configuration.web: Refreshing state... [id=aivideogen-web-477656043770]
+aws_cloudfront_distribution.web: Refreshing state... [id=EWHVOCYSPRAYN]
+aws_s3_object.frontend["js/auth.js"]: Refreshing state... [id=js/auth.js]
+aws_s3_object.frontend["index.html"]: Refreshing state... [id=index.html]
+aws_s3_object.frontend["js/api/MockApiClient.js"]: Refreshing state... [id=js/api/MockApiClient.js]
+aws_s3_object.frontend["js/confirm.js"]: Refreshing state... [id=js/confirm.js]
+aws_s3_object.frontend["js/form.js"]: Refreshing state... [id=js/form.js]
+aws_s3_object.frontend["js/mock/manifests/text.json"]: Refreshing state... [id=js/mock/manifests/text.json]
+aws_s3_object.frontend["js/mock/manifests/avatar.json"]: Refreshing state... [id=js/mock/manifests/avatar.json]
+aws_s3_object.frontend["js/mock/manifests/references.json"]: Refreshing state... [id=js/mock/manifests/references.json]
+aws_s3_object.frontend["js/jobs.js"]: Refreshing state... [id=js/jobs.js]
+aws_s3_object.frontend["js/mock/manifests/video.json"]: Refreshing state... [id=js/mock/manifests/video.json]
+aws_s3_object.frontend["js/mock/manifests/video-audio.json"]: Refreshing state... [id=js/mock/manifests/video-audio.json]
+aws_s3_object.frontend["js/mock/manifests/first-last.json"]: Refreshing state... [id=js/mock/manifests/first-last.json]
+aws_s3_object.frontend["style.css"]: Refreshing state... [id=style.css]
+aws_s3_object.frontend["js/api/ApiClient.js"]: Refreshing state... [id=js/api/ApiClient.js]
+aws_s3_object.frontend["js/app.js"]: Refreshing state... [id=js/app.js]
+aws_s3_object.frontend["js/mock/manifests/text-image.json"]: Refreshing state... [id=js/mock/manifests/text-image.json]
+aws_s3_object.frontend["js/api/RealApiClient.js"]: Refreshing state... [id=js/api/RealApiClient.js]
+aws_s3_object.frontend["assets/sample.mp4"]: Refreshing state... [id=assets/sample.mp4]
+aws_lambda_event_source_mapping.failure_marker: Refreshing state... [id=d410d4eb-feb2-45e7-89aa-1d179039e067]
+aws_appautoscaling_target.worker: Refreshing state... [id=service/aivideogen/aivideogen-worker]
+data.aws_iam_policy_document.web_bucket: Reading...
+data.aws_iam_policy_document.web_bucket: Read complete after 0s [id=1006094557]
+aws_apigatewayv2_api.main: Refreshing state... [id=flhsxfa402]
+aws_s3_bucket_cors_configuration.clips: Refreshing state... [id=aivideogen-clips-477656043770]
+aws_cognito_user_pool_client.web: Refreshing state... [id=6obdkd8hf5o6h88q6cbrb2jcht]
+aws_s3_bucket_policy.web: Refreshing state... [id=aivideogen-web-477656043770]
+aws_lambda_permission.api_gateway: Refreshing state... [id=AllowApiGatewayInvoke]
+aws_apigatewayv2_authorizer.cognito: Refreshing state... [id=k278y9]
+aws_apigatewayv2_integration.api: Refreshing state... [id=8kp05k7]
+aws_apigatewayv2_stage.default: Refreshing state... [id=$default]
+aws_s3_object.web_config: Refreshing state... [id=config.json]
+aws_apigatewayv2_route.preflight: Refreshing state... [id=fssorws]
+aws_apigatewayv2_route.all: Refreshing state... [id=g0ztw7v]
+aws_appautoscaling_policy.wake: Refreshing state... [id=aivideogen-wake]
+aws_appautoscaling_policy.track_jobs: Refreshing state... [id=aivideogen-jobs-per-instance]
+aws_cloudwatch_metric_alarm.jobs_waiting: Refreshing state... [id=aivideogen-jobs-waiting]
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  ~ update in-place
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # aws_cloudwatch_query_definition.usage_per_user will be updated in-place
+  ~ resource "aws_cloudwatch_query_definition" "usage_per_user" {
+        id                  = "19a71ee1-870a-4911-af4e-0cdf65740293"
+        name                = "aivideogen/usage-per-user"
+      ~ query_string        = <<-EOT
+            fields @timestamp
+            | filter event in ["job_attempt", "download", "inputs"]
+          - | stats sum(gpu_seconds) as gpu_seconds, sum(bytes) as bytes, count(*) as events by sub, instance_type
+          + | stats sum(gpu_seconds) as gpu_seconds, sum(bytes) as bytes, count(*) as events by sub, instance_type, quality
+            | sort gpu_seconds desc
+        EOT
+        # (2 unchanged attributes hidden)
+    }
+
+  # aws_ecs_service.worker will be updated in-place
+  ~ resource "aws_ecs_service" "worker" {
+        id                                 = "arn:aws:ecs:us-west-2:477656043770:service/aivideogen/aivideogen-worker"
+        name                               = "aivideogen-worker"
+        tags                               = {}
+      ~ task_definition                    = "arn:aws:ecs:us-west-2:477656043770:task-definition/aivideogen-worker:1" -> (known after apply)
+        # (15 unchanged attributes hidden)
+
+        # (3 unchanged blocks hidden)
+    }
+
+  # aws_ecs_task_definition.worker must be replaced
+-/+ resource "aws_ecs_task_definition" "worker" {
+      ~ arn                      = "arn:aws:ecs:us-west-2:477656043770:task-definition/aivideogen-worker:1" -> (known after apply)
+      ~ arn_without_revision     = "arn:aws:ecs:us-west-2:477656043770:task-definition/aivideogen-worker" -> (known after apply)
+      ~ container_definitions    = jsonencode(
+          ~ [
+              ~ {
+                  ~ environment          = [
+                      + {
+                          + name  = "AWS_DEFAULT_REGION"
+                          + value = "us-west-2"
+                        },
+                        {
+                            name  = "CLIPS_BUCKET"
+                            value = "aivideogen-clips-477656043770"
+                        },
+                        {
+                            name  = "MODELS_DIR"
+                            value = "/data/models"
+                        },
+                      + {
+                          + name  = "MODEL_MANIFEST"
+                          + value = jsonencode(
+                                {
+                                  + inputs = []
+                                  + limits = {
+                                      + prompt_max_chars = 500
+                                    }
+                                  + model  = "wan2-1-t2v-1-3b"
+                                  + params = [
+                                      + {
+                                          + max  = 2147483647
+                                          + min  = 0
+                                          + name = "seed"
+                                          + type = "int"
+                                        },
+                                      + {
+                                          + default = "3"
+                                          + name    = "duration_seconds"
+                                          + type    = "enum"
+                                          + values  = [
+                                              + "3",
+                                              + "5",
+                                            ]
+                                        },
+                                      + {
+                                          + default = "fast"
+                                          + name    = "quality"
+                                          + type    = "enum"
+                                          + values  = [
+                                              + "fast",
+                                              + "high",
+                                            ]
+                                        },
+                                      + {
+                                          + default   = ""
+                                          + max_chars = 200
+                                          + name      = "negative_prompt"
+                                          + type      = "string"
+                                        },
+                                    ]
+                                  + prompt = "required"
+                                }
+                            )
+                        },
+                        {
+                            name  = "QUEUE_URL"
+                            value = "https://sqs.us-west-2.amazonaws.com/477656043770/aivideogen-jobs"
+                        },
+                    ]
+                    name                 = "worker"
+                  - portMappings         = []
+                  - systemControls       = []
+                  - volumesFrom          = []
+                    # (9 unchanged attributes hidden)
+                },
+            ] # forces replacement
+        )
+      ~ enable_fault_injection   = false -> (known after apply)
+      ~ id                       = "aivideogen-worker" -> (known after apply)
+      ~ revision                 = 1 -> (known after apply)
+      - tags                     = {} -> null
+        # (12 unchanged attributes hidden)
+
+      - volume {
+          - configure_at_launch = false -> null
+          - host_path           = "/data" -> null
+          - name                = "data" -> null
+        }
+      + volume {
+          + configure_at_launch = (known after apply)
+          + host_path           = "/data"
+          + name                = "data"
+        }
+    }
+
+  # aws_lambda_function.api will be updated in-place
+  ~ resource "aws_lambda_function" "api" {
+        id                             = "aivideogen-api"
+      ~ last_modified                  = "2026-11-18T17:23:54.000+0000" -> (known after apply)
+      ~ source_code_hash               = "VkpFWgbf4IFWQ6NMdAJllcexBR9GgSB2czVgVNBH/L0=" -> "1K9SvF44pfHYs2llXrpKbDaMEX770rPniiENlDOKsaM="
+        tags                           = {}
+        # (27 unchanged attributes hidden)
+
+      ~ environment {
+          ~ variables = {
+              ~ "MODEL_MANIFEST"       = jsonencode(
+                  ~ {
+                      ~ params = [
+                            # (1 unchanged element hidden)
+                            {
+                                default = "3"
+                                name    = "duration_seconds"
+                                type    = "enum"
+                                values  = [
+                                    "3",
+                                    "5",
+                                ]
+                            },
+                          + {
+                              + default = "fast"
+                              + name    = "quality"
+                              + type    = "enum"
+                              + values  = [
+                                  + "fast",
+                                  + "high",
+                                ]
+                            },
+                            {
+                                default   = ""
+                                max_chars = 200
+                                name      = "negative_prompt"
+                                type      = "string"
+                            },
+                        ]
+                        # (4 unchanged attributes hidden)
+                    }
+                )
+                # (4 unchanged elements hidden)
+            }
+        }
+
+        # (3 unchanged blocks hidden)
+    }
+
+Plan: 1 to add, 3 to change, 1 to destroy.
+
+─────────────────────────────────────────────────────────────────────────────
+
+Saved the plan to: /tmp/tfplan
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "/tmp/tfplan"
+Releasing state lock. This may take a few moments...
