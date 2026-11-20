@@ -90,6 +90,9 @@ except Exception as e:
 '''
 
 CELL_HELPERS = '''import types
+PROMPT_A = "A cat walking through a sunlit garden, cinematic, detailed fur"
+PROMPT_B = "A red balloon floating up above a city street at sunset, soft light"
+
 import numpy as np, imageio
 from PIL import Image
 from IPython.display import display
@@ -144,16 +147,14 @@ def judge(label, frames, secs, peak, want_frames, limit_s=900):
     check(label, "PASS" if ok else "FAIL", why)
 '''
 
-CELL_3S = '''PROMPT_A = "A cat walking through a sunlit garden, cinematic, detailed fur"
-try:
+CELL_3S = '''try:
     f3, s3, p3 = run("clip-3s-30steps", PROMPT_A, "3", 30, 1234)
     judge("3 s clip (49 frames, 30 steps)", f3, s3, p3, 49)
 except Exception as e:
     check("3 s clip (49 frames, 30 steps)", "FAIL", repr(e)[:400])
 '''
 
-CELL_5S = '''PROMPT_B = "A red balloon floating up above a city street at sunset, soft light"
-try:
+CELL_5S = '''try:
     f5, s5, p5 = run("clip-5s-30steps", PROMPT_B, "5", 30, 99)
     judge("5 s clip (81 frames, 30 steps)", f5, s5, p5, 81)
 except Exception as e:
