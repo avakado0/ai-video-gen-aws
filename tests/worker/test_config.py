@@ -20,7 +20,7 @@ def test_defaults_follow_the_spec():
     assert cfg.visibility_timeout == 180
     assert cfg.heartbeat_seconds == 60
     assert cfg.poll_wait_seconds == 20
-    assert cfg.steps == 30
+    assert not hasattr(cfg, "steps")   # steps come from the quality preset (worker/wan.py)
 
 
 def test_a_broken_manifest_stops_the_worker_at_start():

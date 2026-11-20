@@ -15,7 +15,6 @@ class Config:
     heartbeat_seconds: int = 60
     spot_poll_seconds: int = 5
     poll_wait_seconds: int = 20     # SQS long poll
-    steps: int = 30                 # diffusion steps; the Kaggle spike confirms the number
 
     @classmethod
     def from_env(cls, env=None):
@@ -25,5 +24,4 @@ class Config:
             clips_bucket=env["CLIPS_BUCKET"],
             models_dir=env["MODELS_DIR"],
             manifest=manifest_module.load(env["MODEL_MANIFEST"]),
-            steps=int(env.get("STEPS", "30")),
         )

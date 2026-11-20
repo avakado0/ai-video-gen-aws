@@ -1,8 +1,8 @@
 """Wan 2.1 T2V 1.3B through diffusers' WanPipeline (spec section 4, "Model").
 
-UNVERIFIED: nothing here has run on a GPU yet. The Kaggle spike runs this same class and checks
-speed, memory, the step count and whether fp16 gives clean frames. Until then treat the numbers
-below (steps, guidance, flow_shift) as the documented defaults, not measured ones.
+Run on a Kaggle T4 on 2026-11-20 (docs/wan_spike_findings.md): loads, clean frames in fp16 with an
+fp32 VAE, abort frees the GPU. Not yet run on a g4dn instance. Guidance and flow_shift are the
+documented defaults, not tuned.
 
 torch and diffusers are imported inside methods, so the rest of the worker (and its tests)
 load without them.
@@ -13,7 +13,10 @@ import random
 
 from .errors import Aborted
 
-WIDTH, HEIGHT, FPS = 832, 480, 16
+FPS = 16
+# The manifest's `quality` choices: (width, height, steps). Kaggle T4 spike, 2026-11-20, 3 s clip:
+# fast about 4.7 min, high about 15 min (docs/wan_spike_findings.md). Sizes must be multiples of 16.
+QUALITY = {"fast": (640, 368, 20), "high": (832, 480, 30)}
 GUIDANCE_SCALE = 5.0
 FLOW_SHIFT = 3.0          # diffusers' Wan docs: 3.0 for 480p, 5.0 for 720p
 FRAMES = {"3": 49, "5": 81}   # 16 fps, and the model needs 4n+1 frames
@@ -24,15 +27,19 @@ def num_frames(duration_seconds):
     return FRAMES[duration_seconds]
 
 
+def preset(quality):
+    return QUALITY[quality]
+
+
 def pick_seed(params, rng=random):
     seed = params.get("seed")
     return seed if seed is not None else rng.randint(0, MAX_SEED)
 
 
 class WanGenerator:
-    def __init__(self, models_dir, model_name, steps):
+    def __init__(self, models_dir, model_name, steps=None):
         self.path = str(pathlib.Path(models_dir) / model_name)
-        self.steps = steps
+        self.steps = steps        # None: the quality preset decides. The spike notebooks set it.
         self.pipe = None
 
     def load(self):
@@ -82,12 +89,13 @@ class WanGenerator:
             return callback_kwargs
 
         seed = pick_seed(job.params)
+        width, height, preset_steps = preset(job.params["quality"])
         frames = self.pipe(
             prompt=job.prompt,
             negative_prompt=job.params.get("negative_prompt") or None,
-            width=WIDTH, height=HEIGHT,
+            width=width, height=height,
             num_frames=num_frames(job.params["duration_seconds"]),
-            num_inference_steps=self.steps,
+            num_inference_steps=self.steps or preset_steps,
             guidance_scale=GUIDANCE_SCALE,
             generator=torch.Generator("cpu").manual_seed(seed),
             callback_on_step_end=on_step,

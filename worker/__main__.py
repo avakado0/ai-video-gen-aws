@@ -28,7 +28,7 @@ def main():
     signal.signal(signal.SIGINT, lambda *_: stopping.set())
 
     imds = Imds()
-    generator = WanGenerator(config.models_dir, config.manifest["model"], config.steps)
+    generator = WanGenerator(config.models_dir, config.manifest["model"])
     log.info("loading model from %s", generator.path)
     generator.load()
 

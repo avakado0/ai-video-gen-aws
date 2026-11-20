@@ -98,7 +98,7 @@ from PIL import Image
 from IPython.display import display
 
 def job(prompt, seconds, seed):
-    return types.SimpleNamespace(prompt=prompt, params={"seed": seed, "duration_seconds": seconds, "negative_prompt": ""})
+    return types.SimpleNamespace(prompt=prompt, params={"seed": seed, "duration_seconds": seconds, "quality": "high", "negative_prompt": ""})
 
 def read_frames(path):
     rd = imageio.get_reader(str(path), "ffmpeg")
