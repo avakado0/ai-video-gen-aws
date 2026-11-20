@@ -40,7 +40,7 @@ Account `477656043770`, region `us-west-2`. Claude must not do these (console, c
 - [ ] Verify the Free plan end date in the console (Billing -> Account / plan details). The effort log has 2027-04-29 from a popup only. If the account closes then unless upgraded, the GPU go-live and upgrade must happen before it. Write the confirmed date here.
 - [ ] When ready for GPU work (not before): Billing -> Upgrade plan to Paid. One-way. Written human confirmation says the credit survives a manual upgrade. After it, check the Credits page still shows the $100 credit (the id is in your AWS console, Billing -> Credits) with expiry 2027-10-29.
 - [x] Request the Spot quota "All G and VT Spot Instance Requests" in us-west-2: 8 vCPU (`gpu_max = 1`). Requested 2026-11-20, before the upgrade; status Pending. Check Service Quotas -> Quota request history. If denied, paste the reason; do not upgrade just to retry.
-- [ ] Quota approved (applied value shows 8).
+- [x] Quota approved: AWS email 2026-11-20 (about 18:12 +03:00), new limit 8, effective 30 minutes later. Applied value on the Service Quotas page not yet re-checked by the owner.
 - [ ] Never do Organizations, Control Tower, IAM Identity Center, APN or HIPAA/SEC, even after upgrade. AWS says to contact them first.
 - [ ] Make a Kaggle account and verify your phone number (needed for GPU notebooks), for the GPU spike.
 - [ ] Free up disk on your machine (at least 25 GB) before the first worker image build.

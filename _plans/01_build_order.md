@@ -73,7 +73,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 - [ ] H. Manually upgrade to Paid. One-way. Gate: the Credits page still shows the $100 credit, expiry 2027-10-29. Only after phases 3-5 (decision 2026-11-16).
 - [x] H. Request the Spot quota "All G and VT Spot Instance Requests" in us-west-2: 8 vCPU (one `g4dn.2xlarge`, decision 2026-11-18). Requested 2026-11-20 before the upgrade, status Pending, no Support case yet; the applied value was 0.
-- [ ] H. Wait for approval. Do not raise the ASG max size before it.
+- [x] H. Wait for approval. Approved 2026-11-20 by AWS email: "All G and VT Spot Instance Requests" new limit 8 (one `g4dn.2xlarge`), effective 30 minutes after the email. Do not raise the ASG max size before the upgrade to Paid.
 
 ## Phase 7: GPU go-live
 
