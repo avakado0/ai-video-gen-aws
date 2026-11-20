@@ -79,3 +79,6 @@ Real model output and speed (the Kaggle spike runs the same `WanGenerator`), doc
 - `ecs.tf` also gets `AWS_DEFAULT_REGION` (boto3 needs one in the container).
 - Image: `python:3.12-slim` plus the PyPI `torch` wheel instead of a CUDA base image. Requirements pinned from PyPI metadata (newest release at least 30 days old for fast-moving packages).
 - Test count: 257 (170 before).
+
+## Kaggle spike (2026-11-20)
+Findings: `docs/wan_spike_findings.md`. `WanGenerator` runs on a T4. Bug found and fixed (`b539a62`): an aborted run left the model on the GPU (2.7 GiB) and the next run ran out of memory. The generator now drops the traceback, calls `maybe_free_model_hooks()`, `gc.collect()` and `torch.cuda.empty_cache()` on abort; confirmed on a real GPU. Open: defaults (resolution, steps, durations).
