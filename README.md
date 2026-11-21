@@ -69,9 +69,9 @@ Model: Wan 2.1 T2V 1.3B on a Tesla T4. Two quality levels are exposed as a manif
 | Level | Size | Steps | 3 s clip |
 |---|---|---|---|
 | `fast` (default) | 832x480 | 30 | about 13.5 min on the T4 (Kaggle, 808 s); 200 s on a g5.2xlarge (AWS, 2026-11-21) |
-| `high` | 832x480 | 50 | about 21 min on the T4 (Kaggle, 1265 s); about 5 min on a g5.2xlarge (my estimate, not yet measured) |
+| `high` | 832x480 | 50 | 1050 s (17.5 min) on a g4dn.2xlarge T4 (AWS, 2026-11-22, 19.4 s per step); about 21 min on the Kaggle T4; about 5 min on a g5.2xlarge (my estimate, not measured) |
 
-Both levels use Wan's own recommended settings for the 1.3B model (guidance 6, flow_shift 8, Wan's default negative prompt). The first AWS test used flow_shift 3.0, which blew the colours out; plan 05 (`_plans/05_quality_variants.md`) found and fixed that. The 640x368 size of the first spike was dropped: it is below the 480p the model was trained for. Cold start from launch to a ready worker was 6 min 17 s on the g5 (measured). The worker image is 4.16 GB compressed. Weights are 28.9 GB. Rough GPU cost at Spot prices is a few cents per clip (an estimate, not measured on AWS).
+Both levels use Wan's own recommended settings for the 1.3B model (guidance 6, flow_shift 8, Wan's default negative prompt). The first AWS test used flow_shift 3.0, which blew the colours out; plan 05 (`_plans/05_quality_variants.md`) found and fixed that. The 640x368 size of the first spike was dropped: it is below the 480p the model was trained for. Cold start from launch to a ready worker was 6 min 17 s on a g5 and 6 min 34 s on a g4dn (measured). The worker image is 4.16 GB compressed. Weights are 28.9 GB. GPU cost per `high` clip at Spot prices is about $0.09 on the g4dn and about $0.06 to $0.075 on the g5 (my arithmetic from measured seconds and the Spot price range), plus about $0.03 of cold start; the whole 2026-11-22 confirmation run (30 min of g4dn) was about $0.15 (my estimate).
 
 ## Cost model
 
