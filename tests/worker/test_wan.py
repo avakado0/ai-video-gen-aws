@@ -26,9 +26,10 @@ def test_unset_seed_is_random_but_in_the_manifest_range():
     assert 0 <= seed <= 2147483647
 
 
-def test_fast_is_640x368_at_20_steps_and_high_is_832x480_at_30():
-    assert wan.preset("fast") == (640, 368, 20)
-    assert wan.preset("high") == (832, 480, 30)
+def test_both_presets_are_480p_and_differ_in_steps_fast_30_high_50():
+    # Plan 05: 480p is the size Wan 1.3B was trained for; 50 steps is Wan's own default.
+    assert wan.preset("fast") == (832, 480, 30)
+    assert wan.preset("high") == (832, 480, 50)
 
 
 def test_every_size_is_a_multiple_of_16():
@@ -130,9 +131,9 @@ def _generate(monkeypatch, tmp_path, quality, steps=None):
 
 def test_the_pipeline_gets_the_size_and_steps_of_the_chosen_quality(monkeypatch, tmp_path):
     kw = _generate(monkeypatch, tmp_path, "fast")
-    assert (kw["width"], kw["height"], kw["num_inference_steps"], kw["num_frames"]) == (640, 368, 20, 81)
+    assert (kw["width"], kw["height"], kw["num_inference_steps"], kw["num_frames"]) == (832, 480, 30, 81)
     kw = _generate(monkeypatch, tmp_path, "high")
-    assert (kw["width"], kw["height"], kw["num_inference_steps"]) == (832, 480, 30)
+    assert (kw["width"], kw["height"], kw["num_inference_steps"]) == (832, 480, 50)
 
 
 def test_a_steps_override_wins_over_the_preset(monkeypatch, tmp_path):
@@ -171,7 +172,7 @@ def _run_logged(monkeypatch, tmp_path, steps, caplog):
 
 def test_generation_logs_its_settings_and_never_the_prompt(monkeypatch, tmp_path, caplog):
     lines = _run_logged(monkeypatch, tmp_path, 10, caplog)
-    assert any("640x368" in l and "49 frames" in l and "10 steps" in l for l in lines)
+    assert any("832x480" in l and "49 frames" in l and "10 steps" in l for l in lines)
     assert not any("private" in l for l in lines)
 
 
@@ -197,17 +198,24 @@ def _generate_with(monkeypatch, tmp_path, negative_prompt="", **generator_kwargs
     return gen.pipe.kwargs
 
 
-def test_guidance_defaults_to_5_and_can_be_overridden(monkeypatch, tmp_path):
-    assert _generate_with(monkeypatch, tmp_path)["guidance_scale"] == 5.0
-    assert _generate_with(monkeypatch, tmp_path, guidance=6.0)["guidance_scale"] == 6.0
+def test_guidance_defaults_to_6_and_can_be_overridden(monkeypatch, tmp_path):
+    assert _generate_with(monkeypatch, tmp_path)["guidance_scale"] == 6.0
+    assert _generate_with(monkeypatch, tmp_path, guidance=5.0)["guidance_scale"] == 5.0
 
 
 def test_guidance_of_zero_is_honoured_not_replaced_by_the_default(monkeypatch, tmp_path):
     assert _generate_with(monkeypatch, tmp_path, guidance=0.0)["guidance_scale"] == 0.0
 
 
-def test_no_negative_prompt_anywhere_means_none(monkeypatch, tmp_path):
-    assert _generate_with(monkeypatch, tmp_path)["negative_prompt"] is None
+def test_no_negative_prompt_from_the_job_means_wans_official_default(monkeypatch, tmp_path):
+    kw = _generate_with(monkeypatch, tmp_path)
+    assert kw["negative_prompt"] == wan.DEFAULT_NEGATIVE_PROMPT
+    assert kw["negative_prompt"].startswith("Bright tones, overexposed")
+
+
+def test_the_job_prompt_replaces_the_default_it_is_not_added_to_it(monkeypatch, tmp_path):
+    kw = _generate_with(monkeypatch, tmp_path, negative_prompt="blurry")
+    assert kw["negative_prompt"] == "blurry"
 
 
 def test_the_jobs_own_negative_prompt_is_used_when_it_has_one(monkeypatch, tmp_path):
@@ -256,6 +264,6 @@ def _load_recording_flow_shift(monkeypatch, tmp_path, **generator_kwargs):
     return seen["flow_shift"]
 
 
-def test_flow_shift_defaults_to_3_and_can_be_overridden(monkeypatch, tmp_path):
-    assert _load_recording_flow_shift(monkeypatch, tmp_path) == 3.0
-    assert _load_recording_flow_shift(monkeypatch, tmp_path, flow_shift=8.0) == 8.0
+def test_flow_shift_defaults_to_8_and_can_be_overridden(monkeypatch, tmp_path):
+    assert _load_recording_flow_shift(monkeypatch, tmp_path) == 8.0
+    assert _load_recording_flow_shift(monkeypatch, tmp_path, flow_shift=3.0) == 3.0

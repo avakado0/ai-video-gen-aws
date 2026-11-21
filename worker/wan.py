@@ -1,8 +1,9 @@
 """Wan 2.1 T2V 1.3B through diffusers' WanPipeline (spec section 4, "Model").
 
 Run on a Kaggle T4 on 2026-11-20 (docs/wan_spike_findings.md): loads, clean frames in fp16 with an
-fp32 VAE, abort frees the GPU. Not yet run on a g4dn instance. Guidance and flow_shift are the
-documented defaults, not tuned.
+fp32 VAE, abort frees the GPU. Ran on a g5.2xlarge on 2026-11-21. Settings tuned on Kaggle in plan 05
+(_plans/05_quality_variants.md): flow_shift 3.0 (from a 14B docstring) blew the colours out; Wan's
+README recipe (flow_shift 8, guidance 6, 50 steps, official negative prompt) was judged usable.
 
 torch and diffusers are imported inside methods, so the rest of the worker (and its tests)
 load without them.
@@ -17,11 +18,20 @@ from .errors import Aborted
 log = logging.getLogger(__name__)
 
 FPS = 16
-# The manifest's `quality` choices: (width, height, steps). Kaggle T4 spike, 2026-11-20, 3 s clip:
-# fast about 4.7 min, high about 15 min (docs/wan_spike_findings.md). Sizes must be multiples of 16.
-QUALITY = {"fast": (640, 368, 20), "high": (832, 480, 30)}
-GUIDANCE_SCALE = 5.0
-FLOW_SHIFT = 3.0          # diffusers' Wan docs: 3.0 for 480p, 5.0 for 720p
+# The manifest's `quality` choices: (width, height, steps). Both are 480p, the size the 1.3B model was
+# trained for (640x368 was soft). Sizes must be multiples of 16. Kaggle T4, 3 s clip, plan 05: 30 steps
+# about 13.5 min, 50 steps about 21 min.
+QUALITY = {"fast": (832, 480, 30), "high": (832, 480, 50)}
+GUIDANCE_SCALE = 6.0      # Wan README recommendation for the 1.3B model (code default 5.0)
+FLOW_SHIFT = 8.0          # Wan README: adjust within 8 to 12 for the 1.3B model (code default 5.0)
+# Wan's own default negative prompt (English version, diffusers WanPipeline docstring). Used when the
+# job gives none; a negative prompt typed by the user replaces it. Run 9 (plan 05) used it.
+DEFAULT_NEGATIVE_PROMPT = (
+    "Bright tones, overexposed, static, blurred details, subtitles, style, works, paintings, images, static, "
+    "overall gray, worst quality, low quality, JPEG compression residue, ugly, incomplete, extra fingers, "
+    "poorly drawn hands, poorly drawn faces, deformed, disfigured, misshapen limbs, fused fingers, "
+    "still picture, messy background, three legs, many people in the background, walking backwards"
+)
 FRAMES = {"3": 49, "5": 81}   # 16 fps, and the model needs 4n+1 frames
 MAX_SEED = 2147483647
 LOG_EVERY_STEPS = 5      # one progress line per this many denoising steps, plus the last
@@ -49,7 +59,7 @@ class WanGenerator:
         self.steps = steps
         self.guidance = guidance
         self.flow_shift = flow_shift
-        self.default_negative_prompt = default_negative_prompt   # used when the job gives none
+        self.default_negative_prompt = default_negative_prompt   # None: DEFAULT_NEGATIVE_PROMPT
         self.pipe = None
 
     def load(self):
@@ -111,7 +121,7 @@ class WanGenerator:
 
         frames = self.pipe(
             prompt=job.prompt,
-            negative_prompt=job.params.get("negative_prompt") or self.default_negative_prompt or None,
+            negative_prompt=job.params.get("negative_prompt") or self.default_negative_prompt or DEFAULT_NEGATIVE_PROMPT,
             width=width, height=height,
             num_frames=frame_count,
             num_inference_steps=total_steps,
