@@ -93,3 +93,15 @@ About 63 GB if we copy only the needed files in bf16, about 47 GB with int8 (my 
 
 ## Consequence for the spike
 Kaggle's 16 GB T4 cannot hold the bf16 transformer (31.7 GB), so the spike runs on AWS. Next: look up the Spot price and confirm the quota, then one short paid test. See `_plans/04_avatar_model.md` step B.
+
+## Follow-up findings, 2026-11-21 (vocal separator, GPU memory, Spot prices)
+
+**`Kim_Vocal_2.onnx` has no stated licence.** Read: python-audio-separator (MIT for its own code, silent on models), the UVR project README (code "MIT-licensed", asks users of the models to credit UVR, no model terms; its LICENSE page returned 404), and the UVR model repository (README empty, release assets did not load). No page names the author of Kim_Vocal_2 or says whether commercial use is allowed. Under the strict rule it cannot be confirmed commercial-safe.
+
+**It can be left out.** In `run_demo_avatar_single_audio_to_video.py` the separation call is unconditional and there is no flag to skip it, but our worker will not run that demo script. It will call the LongCat pipeline from its own `worker/avatar.py` (code is MIT) and pass the audio to the Whisper encoder without the separator. The separator is the only step that removes non-voice sound; what that does to quality is not stated by the repo. The spike must test lip-sync with raw clean-speech audio. Whisper-large-v3 is Apache-2.0. Kim_Vocal_2 would then not be downloaded or shipped.
+
+**Audio handling facts (from the script):** the pipeline resamples to 16 kHz mono; audio longer than the video is cut, shorter is padded with silence; the output mp4 carries the original (unseparated) audio. For 1.6 the audio encoder is Whisper-large-v3 and the script maps the 1.6 path onto the 1.5 code path (25 fps, 93 frames, 13 conditioning frames).
+
+**GPU memory (from the code, no figures stated).** The demo needs torchrun environment variables (RANK, nccl); `--context_parallel_size` defaults to 1, so one process looks plausible but is not documented. Models are loaded in bf16 and moved to the GPU whole; no CPU offload anywhere. Rough sum of what sits on the GPU: transformer 31.7 GB (bf16) or 15.9 GB (int8), plus the UMT5 text encoder and Whisper, plus activations. My arithmetic, not measured: bf16 with everything resident does not fit 48 GB comfortably; moving the text encoder and Whisper off the GPU after use (we control this in our own worker) or using int8 should. 24 GB (g5.2xlarge) looks too small even with int8 once activations are counted.
+
+**Spot prices seen 2026-11-21 (us-west-2, per hour):** g6e.2xlarge $0.99 in zone a, $2.21 in zones b, c and d (about on-demand, so little spare capacity); g5.2xlarge $0.71 to $0.87. Our subnets are in zones a and b only (`terraform/vpc.tf`), so the ASG could land a g6e in b at $2.21 while a hand-launched spike can choose a.
