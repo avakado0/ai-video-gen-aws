@@ -137,3 +137,48 @@ def test_the_pipeline_gets_the_size_and_steps_of_the_chosen_quality(monkeypatch,
 
 def test_a_steps_override_wins_over_the_preset(monkeypatch, tmp_path):
     assert _generate(monkeypatch, tmp_path, "high", steps=8)["num_inference_steps"] == 8
+
+
+# --- what the log says during generation -----------------------------------------------
+
+class _SteppingPipe:
+    """Calls the step callback `steps` times, as diffusers does, then returns."""
+
+    def __init__(self, steps):
+        self.steps = steps
+
+    def __call__(self, callback_on_step_end=None, **kw):
+        import types
+        for i in range(self.steps):
+            callback_on_step_end(self, i, 0, {})
+        return types.SimpleNamespace(frames=[[]])
+
+    def maybe_free_model_hooks(self):
+        pass
+
+
+def _run_logged(monkeypatch, tmp_path, steps, caplog):
+    import logging
+    import types
+    caplog.set_level(logging.INFO, logger="worker.wan")
+    _install_fake_torch(monkeypatch, [])
+    gen = wan.WanGenerator(tmp_path, "m", steps=steps)
+    gen.pipe = _SteppingPipe(steps)
+    job = types.SimpleNamespace(prompt="a very private cat", params={"duration_seconds": "3", "quality": "fast"})
+    gen.generate(job, {}, lambda: False, tmp_path)
+    return [r.getMessage() for r in caplog.records]
+
+
+def test_generation_logs_its_settings_and_never_the_prompt(monkeypatch, tmp_path, caplog):
+    lines = _run_logged(monkeypatch, tmp_path, 10, caplog)
+    assert any("640x368" in l and "49 frames" in l and "10 steps" in l for l in lines)
+    assert not any("private" in l for l in lines)
+
+
+def test_generation_logs_progress_every_few_steps_and_the_last_one(monkeypatch, tmp_path, caplog):
+    lines = _run_logged(monkeypatch, tmp_path, 12, caplog)
+    steps_logged = [l for l in lines if "step " in l]
+    assert any("step 5/12" in l for l in steps_logged)
+    assert any("step 10/12" in l for l in steps_logged)
+    assert any("step 12/12" in l for l in steps_logged)
+    assert not any("step 4/12" in l for l in steps_logged)

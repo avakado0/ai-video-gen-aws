@@ -8,10 +8,13 @@ torch and diffusers are imported inside methods, so the rest of the worker (and 
 load without them.
 """
 import gc
+import logging
 import pathlib
 import random
 
 from .errors import Aborted
+
+log = logging.getLogger(__name__)
 
 FPS = 16
 # The manifest's `quality` choices: (width, height, steps). Kaggle T4 spike, 2026-11-20, 3 s clip:
@@ -21,6 +24,7 @@ GUIDANCE_SCALE = 5.0
 FLOW_SHIFT = 3.0          # diffusers' Wan docs: 3.0 for 480p, 5.0 for 720p
 FRAMES = {"3": 49, "5": 81}   # 16 fps, and the model needs 4n+1 frames
 MAX_SEED = 2147483647
+LOG_EVERY_STEPS = 5      # one progress line per this many denoising steps, plus the last
 
 
 def num_frames(duration_seconds):
@@ -83,19 +87,27 @@ class WanGenerator:
         if should_abort():
             raise Aborted()
 
+        seed = pick_seed(job.params)
+        width, height, preset_steps = preset(job.params["quality"])
+        total_steps = self.steps or preset_steps
+        frame_count = num_frames(job.params["duration_seconds"])
+        # Settings only, never the prompt (it may be private).
+        log.info("generating %dx%d, %d frames, %d steps", width, height, frame_count, total_steps)
+
         def on_step(pipe, step, timestep, callback_kwargs):
             if should_abort():
                 raise Aborted()          # leaves the denoising loop between two steps
+            done = step + 1
+            if done % LOG_EVERY_STEPS == 0 or done == total_steps:
+                log.info("step %d/%d", done, total_steps)
             return callback_kwargs
 
-        seed = pick_seed(job.params)
-        width, height, preset_steps = preset(job.params["quality"])
         frames = self.pipe(
             prompt=job.prompt,
             negative_prompt=job.params.get("negative_prompt") or None,
             width=width, height=height,
-            num_frames=num_frames(job.params["duration_seconds"]),
-            num_inference_steps=self.steps or preset_steps,
+            num_frames=frame_count,
+            num_inference_steps=total_steps,
             guidance_scale=GUIDANCE_SCALE,
             generator=torch.Generator("cpu").manual_seed(seed),
             callback_on_step_end=on_step,
