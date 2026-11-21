@@ -25,6 +25,12 @@ flow_shift 3.0 against 5.0) and the Wan README recommends guidance 6 and flow_sh
 model. This notebook runs nine variants of one 3 s clip (832x480, same seed, same prompt) and saves each
 as an **mp4** in `/kaggle/working` (Output tab) so you can watch them side by side.
 
+**Run 1 first, and compare it with the clip from AWS** (the `high` clip saved in `outputs/`): the AWS clip had
+good anatomy but blown-out colour (flat cyan sea, orange cat clipped, white spray burned), while the earlier Kaggle
+frames (a cat in a garden) looked natural. Run 1 uses the surfing prompt and the AWS settings. If run 1 is blown out too,
+the prompt or settings cause it ("vivid colors" and "bright tropical sun" were in the prompt); if run 1 looks natural,
+the cause is the AWS setup (torch 2.8.0 on an A10G against torch 2.11 on a T4).
+
 Run the cells **one at a time with Shift+Enter, top to bottom**. Each run is its own cell; if one fails, go on.
 A 30-step run takes about 15 minutes and a 50-step run about 25 (T4). Runs 2 and 3 tell you first which single
 knob matters most; runs 5 and 8 can be skipped if time is short. Free, nothing on AWS.

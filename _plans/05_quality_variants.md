@@ -18,6 +18,8 @@ Verified 2026-11-21 (Phase 0). Sources: the Wan 2.1 repo, `README.md`, `generate
 | resolution | 640x368 `fast`, 832x480 `high` | | 480p recommended; 720p "less stable" | 832x480 |
 | negative prompt | the user's short one, or none | a long default list (oversaturated, overexposed, static, blurred, low quality, extra fingers, deformed and so on) | | none |
 
+Colour finding (2026-11-21, by eye, owner's observation plus frames extracted from the saved AWS `high` clip): the AWS clip has good anatomy but blown-out colour and contrast (flat cyan sea, orange cat clipped, white spray burned). The earlier Kaggle frames (garden cat, same model and `wan.py`) were natural. So the first question is what differs: (1) the prompt (mine had "vivid colors", "bright tropical sun", "glassy turquoise"; the Kaggle one was "sunlit garden, cinematic, detailed fur"), (2) the environment (torch 2.8.0 on an A10G in the image against torch 2.11 on a T4 on Kaggle), (3) the short negative prompt. Grid run 1 (surfing prompt, AWS settings, on Kaggle) separates (1) from (2): blown out means prompt or settings, natural means the AWS setup.
+
 What this says:
 - We are below Wan's own defaults on steps and on flow_shift (3.0 against 5.0), and the README recommends higher values for both on this model. The 3.0 came from a diffusers docstring for the 14B model; nobody tuned it (the `worker/wan.py` header says so).
 - `fast` (640x368) is below the 480p the model was trained for. Expect it to be soft however the other knobs are set.
