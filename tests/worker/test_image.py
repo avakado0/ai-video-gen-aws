@@ -30,6 +30,11 @@ def test_the_libraries_the_wan_pipeline_imports_are_listed():
         assert name in pins(), name
 
 
+def test_huggingface_hub_is_pinned_to_the_version_the_spike_and_image_resolved():
+    # It arrives through transformers; pinning stops a rebuild from picking up an untested release.
+    assert pins().get("huggingface-hub") == "0.36.2"
+
+
 def test_image_ships_the_worker_and_the_shared_code():
     assert re.search(r"^COPY worker/? ", DOCKERFILE, re.M)
     assert re.search(r"^COPY lambdas/common ", DOCKERFILE, re.M)
