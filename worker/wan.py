@@ -41,9 +41,15 @@ def pick_seed(params, rng=random):
 
 
 class WanGenerator:
-    def __init__(self, models_dir, model_name, steps=None):
+    def __init__(self, models_dir, model_name, steps=None, guidance=None, flow_shift=None,
+                 default_negative_prompt=None):
         self.path = str(pathlib.Path(models_dir) / model_name)
-        self.steps = steps        # None: the quality preset decides. The spike notebooks set it.
+        # None for each: the module default (or the quality preset) decides. Only the spike
+        # notebooks set these, to compare settings (plan 05); the worker uses the defaults.
+        self.steps = steps
+        self.guidance = guidance
+        self.flow_shift = flow_shift
+        self.default_negative_prompt = default_negative_prompt   # used when the job gives none
         self.pipe = None
 
     def load(self):
@@ -54,7 +60,8 @@ class WanGenerator:
 
         vae = AutoencoderKLWan.from_pretrained(self.path, subfolder="vae", torch_dtype=torch.float32)
         pipe = WanPipeline.from_pretrained(self.path, vae=vae, torch_dtype=torch.float16)
-        pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config, flow_shift=FLOW_SHIFT)
+        flow_shift = FLOW_SHIFT if self.flow_shift is None else self.flow_shift
+        pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config, flow_shift=flow_shift)
         pipe.enable_model_cpu_offload()
         self.pipe = pipe
 
@@ -104,11 +111,11 @@ class WanGenerator:
 
         frames = self.pipe(
             prompt=job.prompt,
-            negative_prompt=job.params.get("negative_prompt") or None,
+            negative_prompt=job.params.get("negative_prompt") or self.default_negative_prompt or None,
             width=width, height=height,
             num_frames=frame_count,
             num_inference_steps=total_steps,
-            guidance_scale=GUIDANCE_SCALE,
+            guidance_scale=GUIDANCE_SCALE if self.guidance is None else self.guidance,
             generator=torch.Generator("cpu").manual_seed(seed),
             callback_on_step_end=on_step,
         ).frames[0]

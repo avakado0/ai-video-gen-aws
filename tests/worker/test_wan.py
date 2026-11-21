@@ -182,3 +182,80 @@ def test_generation_logs_progress_every_few_steps_and_the_last_one(monkeypatch, 
     assert any("step 10/12" in l for l in steps_logged)
     assert any("step 12/12" in l for l in steps_logged)
     assert not any("step 4/12" in l for l in steps_logged)
+
+
+# --- tunable guidance, flow_shift and default negative prompt (plan 05, Kaggle quality grid) ------
+
+def _generate_with(monkeypatch, tmp_path, negative_prompt="", **generator_kwargs):
+    import types
+    _install_fake_torch(monkeypatch, [])
+    gen = wan.WanGenerator(tmp_path, "m", **generator_kwargs)
+    gen.pipe = _RecordingPipe()
+    job = types.SimpleNamespace(prompt="p", params={"duration_seconds": "3", "quality": "high",
+                                                    "negative_prompt": negative_prompt})
+    gen.generate(job, {}, lambda: False, tmp_path)
+    return gen.pipe.kwargs
+
+
+def test_guidance_defaults_to_5_and_can_be_overridden(monkeypatch, tmp_path):
+    assert _generate_with(monkeypatch, tmp_path)["guidance_scale"] == 5.0
+    assert _generate_with(monkeypatch, tmp_path, guidance=6.0)["guidance_scale"] == 6.0
+
+
+def test_guidance_of_zero_is_honoured_not_replaced_by_the_default(monkeypatch, tmp_path):
+    assert _generate_with(monkeypatch, tmp_path, guidance=0.0)["guidance_scale"] == 0.0
+
+
+def test_no_negative_prompt_anywhere_means_none(monkeypatch, tmp_path):
+    assert _generate_with(monkeypatch, tmp_path)["negative_prompt"] is None
+
+
+def test_the_jobs_own_negative_prompt_is_used_when_it_has_one(monkeypatch, tmp_path):
+    kw = _generate_with(monkeypatch, tmp_path, negative_prompt="blurry", default_negative_prompt="oversaturated")
+    assert kw["negative_prompt"] == "blurry"
+
+
+def test_the_default_negative_prompt_fills_in_when_the_job_has_none(monkeypatch, tmp_path):
+    kw = _generate_with(monkeypatch, tmp_path, negative_prompt="", default_negative_prompt="oversaturated")
+    assert kw["negative_prompt"] == "oversaturated"
+
+
+def _load_recording_flow_shift(monkeypatch, tmp_path, **generator_kwargs):
+    import types
+    seen = {}
+
+    class Scheduler:
+        @staticmethod
+        def from_config(config, flow_shift):
+            seen["flow_shift"] = flow_shift
+            return "scheduler"
+
+    class Pipe:
+        scheduler = types.SimpleNamespace(config={})
+
+        @classmethod
+        def from_pretrained(cls, *a, **k):
+            return cls()
+
+        def enable_model_cpu_offload(self):
+            pass
+
+    class Vae:
+        @staticmethod
+        def from_pretrained(*a, **k):
+            return "vae"
+
+    torch = types.ModuleType("torch")
+    torch.float32 = torch.float16 = "dtype"
+    diffusers = types.ModuleType("diffusers")
+    diffusers.AutoencoderKLWan, diffusers.WanPipeline = Vae, Pipe
+    diffusers.UniPCMultistepScheduler = Scheduler
+    monkeypatch.setitem(sys.modules, "torch", torch)
+    monkeypatch.setitem(sys.modules, "diffusers", diffusers)
+    wan.WanGenerator(tmp_path, "m", **generator_kwargs).load()
+    return seen["flow_shift"]
+
+
+def test_flow_shift_defaults_to_3_and_can_be_overridden(monkeypatch, tmp_path):
+    assert _load_recording_flow_shift(monkeypatch, tmp_path) == 3.0
+    assert _load_recording_flow_shift(monkeypatch, tmp_path, flow_shift=8.0) == 8.0
