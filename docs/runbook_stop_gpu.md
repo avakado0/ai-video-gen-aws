@@ -23,7 +23,7 @@ aws autoscaling update-auto-scaling-group --auto-scaling-group-name aivideogen-g
 
 The cluster name is `aivideogen` (`terraform/variables.tf`). If in doubt: `aws ecs list-clusters --region us-west-2`.
 
-Task scale-in protection and ECS managed termination protection can delay the shutdown by a few minutes.
+Task scale-in protection and ECS managed termination protection delay the shutdown. Observed 2026-11-21 (idle instance, no job running): the instance stayed `running` for a few minutes after the three commands, then went `Terminating:Proceed` with protection cleared, with no manual step. Wait; check with `aws autoscaling describe-auto-scaling-instances --region us-west-2 --query 'AutoScalingInstances[].[LifecycleState,ProtectedFromScaleIn]' --output text`. Only if it is still `True` after about 10 minutes, remove it by hand: `aws autoscaling set-instance-protection --auto-scaling-group-name aivideogen-gpu --instance-ids <id> --no-protected-from-scale-in --region us-west-2`.
 
 ## Check that it is gone
 
