@@ -67,3 +67,29 @@ Notes:
 
 ## Consequence for the spike
 The strict-rule candidates (LongCat-Video-Avatar, InfiniteTalk) are about 14B-parameter models. In bf16 the weights alone are about 27 GB, so they will not run on the free Kaggle T4 (16 GB) except with heavy CPU offload, which is slow and not representative. They are also larger than the g5.2xlarge's 24 GB without int8 or fp8. The spike therefore probably has to run on AWS or a rented GPU, not on Kaggle (see `_plans/04_avatar_model.md`, step B).
+
+## Chosen candidate: LongCat-Video-Avatar 1.6 (owner, 2026-11-21)
+Read from the model cards, file listings and `run_demo_avatar_single_audio_to_video.py` on 2026-11-21. Not yet run by us.
+
+**Licences.** Avatar 1.6 weights: MIT (card tag and README). Base `LongCat-Video`: MIT tag. `openai/whisper-large-v3` (audio encoder, shipped inside the avatar repo): Apache-2.0 tag. `google/umt5-xxl` (acknowledged by the README): Apache-2.0 tag, but the cards do not say the base repo's text encoder is UMT5. **Unresolved: `vocal_separator/Kim_Vocal_2.onnx`** (66.8 MB, used by `audio-separator` to isolate the voice from the audio before encoding). No licence for it was found on any page read. It ships inside Meituan's MIT-tagged repo, which is not the same as a stated grant from its author. Options once checked: find its licence; or confirm the pipeline can skip vocal separation for clean speech, or replace it, which means changing the model's input path and re-testing quality.
+
+**What must be on the instance** (sizes as listed on Hugging Face):
+| Part | bf16 | int8 option |
+|---|---|---|
+| Avatar `base_model` (the transformer) | 31.7 GB | `base_model_int8` 15.9 GB |
+| LoRAs (`loraA` DMD, `loraB` OPSD) | 2 x 2.52 GB | same |
+| `whisper-large-v3` | 24.7 GB listed (several duplicate formats; `model.safetensors` is 3.09 GB) | same |
+| Base repo `text_encoder` + `vae` + `tokenizer` | 22.7 + 0.5 GB | same |
+| `Kim_Vocal_2.onnx` | 0.07 GB | same |
+About 63 GB if we copy only the needed files in bf16, about 47 GB with int8 (my arithmetic). The Wan 1.3B set was 29 GB, so the weight copy at every boot roughly doubles. Fits the 225 GB (g4dn) and 450 GB (g6e) instance stores.
+
+**Run settings (README and script).**
+- Input JSON: `prompt` (required), `cond_image`, `cond_audio.person1`. The README gives only 2-GPU `torchrun` commands (`--nproc_per_node=2 --context_parallel_size=2`). A single-GPU run is not documented; memory is not stated.
+- 1.6 uses 8 denoising steps (`--use_distill`, `--mix_steps=4`, `--mix_alpha=1.0`), 480p = 480x832, 25 fps, 93 frames for the first segment (about 3.7 s) and 80 more per extra segment (about 3.2 s). A 30 s clip is about 9 segments. Speed per segment is not stated; we must measure it.
+- Options: `--use_int8` (halves the transformer, quality effect not stated), `--use_fp8` (needs Transformer Engine, cannot combine with int8).
+- Needs torch 2.6.0 (cu124), flash-attn 2.7.4.post1, Python 3.10, `audio-separator` 0.30.2 and conda ffmpeg and librosa; our image is Python 3.12 and torch 2.8, so the image changes.
+
+**GPU to test on.** `g6e.2xlarge` (from AWS's own G6e table via a search result, not read directly): 8 vCPU, 64 GiB RAM, one NVIDIA L40S with 48 GB (another AWS table says 44 GiB), 450 GB local NVMe. An aggregator lists on-demand at about $2.24 an hour; the Spot price is not looked up yet. I believe g6e falls under the "All G and VT Spot Instance Requests" quota you already have at 8 vCPU, but I have not confirmed that.
+
+## Consequence for the spike
+Kaggle's 16 GB T4 cannot hold the bf16 transformer (31.7 GB), so the spike runs on AWS. Next: look up the Spot price and confirm the quota, then one short paid test. See `_plans/04_avatar_model.md` step B.
