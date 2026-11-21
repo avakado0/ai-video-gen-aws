@@ -37,7 +37,7 @@ Account `477656043770`, region `us-west-2`. Claude must not do these (console, c
 - [x] Keep `the-admin-user` console-only, with MFA and no access key. Checked 2026-11-16: MFA assigned, no access keys.
 - Local profiles seen: `idefault` (likely a typo), `atlas-polly` (another project), `terraform-deployer`. Run Terraform with `export AWS_PROFILE=terraform-deployer`.
 - [x] ~~Add to the pending Support case: Free plan g4dn question~~ Answered 2026-11-10: g4dn needs Paid (see effort log, item 8).
-- [ ] Verify the Free plan end date in the console (Billing -> Account / plan details). The effort log has 2027-04-29 from a popup only. If the account closes then unless upgraded, the GPU go-live and upgrade must happen before it. Write the confirmed date here.
+- [x] ~~Verify the Free plan end date in the console.~~ Moot 2026-11-21: the manual upgrade to Paid ends the Free plan whatever the date is. Known date 2027-04-29, from the plan popup only, never verified.
 - [ ] When ready for GPU work (not before): Billing -> Upgrade plan to Paid. One-way. Written human confirmation says the credit survives a manual upgrade. After it, check the Credits page still shows the $100 credit (the id is in your AWS console, Billing -> Credits) with expiry 2027-10-29.
 - [x] Request the Spot quota "All G and VT Spot Instance Requests" in us-west-2: 8 vCPU (`gpu_max = 1`). Requested 2026-11-20, before the upgrade; status Pending. Check Service Quotas -> Quota request history. If denied, paste the reason; do not upgrade just to retry.
 - [x] Quota approved: AWS email 2026-11-20 (about 18:12 +03:00), new limit 8, effective 30 minutes later. Applied value confirmed 8.0 with `aws service-quotas get-service-quota --service-code ec2 --quota-code L-3819A6DF` (2026-11-20).

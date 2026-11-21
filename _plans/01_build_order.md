@@ -19,7 +19,7 @@ Steps are in `human_todo/aws_setup.md`.
 - [x] H. Create IAM user `terraform-deployer` (no console, AdministratorAccess, one key) with `aws configure --profile terraform-deployer`. Fix or delete the invalid local CLI profile. Gate: `aws sts get-caller-identity --profile terraform-deployer` works. Done 2026-11-16, with an inline Deny guard policy (Organizations, Control Tower, Identity Center, Marketplace, CloseAccount).
 - [x] H. Keep `the-admin-user` console-only with MFA and no key.
 - [x] H. Create the Terraform state bucket in CloudShell and run the four verify commands. Check `terraform version` is 1.10 or newer. Gate: `terraform init` succeeds with the existing `backend.tf`. Progress 2026-11-17: bucket `aivideogen-tfstate-477656043770` created and verified, Terraform v1.15.8. `terraform init -reconfigure` succeeded with the S3 backend (gate met).
-- [ ] H. Verify the Free plan end date in the console and write it in `human_todo/aws_setup.md`.
+- [x] H. ~~Verify the Free plan end date in the console and write it in `human_todo/aws_setup.md`.~~ Moot 2026-11-21: the manual upgrade to Paid ends the Free plan whatever the date is. Known date 2027-04-29 (plan popup only, never verified).
 - [x] H. Free 25 GB of disk. Make a Kaggle account with phone verification. Done: Kaggle spike ran 2026-11-20, worker image built locally.
 
 ## Phase 1: Free Terraform, validate only
