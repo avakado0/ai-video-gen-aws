@@ -360,3 +360,24 @@ def test_run_forever_works_through_the_queue_then_stops_on_sigterm(env):
     env.generator.script = script
     env.worker.run_forever()
     assert len(env.generator.calls) == 1 and env.usage[0]["outcome"] == "released"
+
+
+# --- what the log says (CloudWatch is the only window into a running job) ------------
+
+def test_the_log_says_when_a_job_is_picked_up_and_when_the_clip_is_uploaded(env, caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="worker")
+    env.submit(params={"quality": "high"})
+    env.run_one()
+    lines = [r.getMessage() for r in caplog.records]
+    assert any(JOB_ID in l and "received" in l and "attempt 1" in l and "high" in l for l in lines)
+    assert any(JOB_ID in l and "uploaded" in l for l in lines)
+
+
+def test_the_log_never_carries_the_prompt_or_the_user_id(env, caplog):
+    import logging
+    caplog.set_level(logging.INFO, logger="worker")
+    env.submit(prompt="a very private cat")
+    env.run_one()
+    text = " ".join(r.getMessage() for r in caplog.records)
+    assert "private" not in text and SUB not in text

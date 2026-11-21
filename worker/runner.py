@@ -51,6 +51,9 @@ class Worker:
             return "bad_message"
 
         started = self.clock()        # spec 3H: wall-clock from receive to delete or release
+        # Ids and settings only, never the prompt or the user's id: CloudWatch is the one window into a job.
+        log.info("received job %s (attempt %d, quality %s)", job.job_id, job.receive_count,
+                 job.params.get("quality"))
         outcome = "error"
         try:
             outcome = self._attempt(message, job)
@@ -97,6 +100,7 @@ class Worker:
                     outcome = self._decide(watcher, job)
                     if outcome == "ok":
                         self.store.upload_clip(job.sub, job.job_id, clip)
+                        log.info("uploaded clip for job %s", job.job_id)
             # The watcher thread has stopped, so its heartbeat cannot undo what follows.
             if outcome == "released":
                 self._release(message)
