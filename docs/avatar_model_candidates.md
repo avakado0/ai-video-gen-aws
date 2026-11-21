@@ -48,3 +48,22 @@ Not candidates: MuseTalk and LatentSync (need a video, not a photo), Wav2Lip (co
 
 ## Decision (owner, 2026-11-21)
 The plan is to make money from the videos, so the strict rule applies: code, weights and every bundled or base model need a clear commercial grant. The three older photo-driven candidates above do not pass it cleanly. The search moves to newer models (see the second table below once filled in) and to a paid API as a fallback.
+
+## Newer models, read 2026-11-21 (second round, after the commercial-use decision)
+
+| Model | Code licence | Weights licence | Inputs | Size / memory | Last activity | Against the strict rule |
+|---|---|---|---|---|---|---|
+| LongCat-Video-Avatar 1.0, 1.5, 1.6 (Meituan) | MIT | MIT, stated separately | audio + image (ai2v), audio + text, video continuation | base 13.6B parameters; no VRAM figure; `--use_int8` and `--use_fp8` options; examples use 2 GPUs | 1.6 released 2026-11-15; active | passes on code and weights; base-model licences not checked |
+| InfiniteTalk (MeiGen-AI) | Apache-2.0 | Apache-2.0, stated separately | image + audio (or video + audio), up to about 1 minute per clip | built on Wan2.1-I2V-14B-480P; no VRAM figure; fp8 mode (single GPU); `--num_persistent_param_in_dit 0` for low VRAM; whole HF repo 169 GB | news 2025-08-19 | passes on code and weights; Wan base and wav2vec2 licences not checked |
+| Wan2.2-S2V-14B (Alibaba) | Apache-2.0 | Apache-2.0 (HF tag) | image + audio + optional text, optional pose video | README: "at least 80GB VRAM" for single GPU | released 2025-08-26 | licence passes; GPU is far too big for our instances |
+| OmniAvatar 1.3B / 14B | Apache-2.0 | **not stated** | image + audio + text prompt | 14B: 8 to 36 GB depending on offload (A800 table); 1.3B not stated; 480p only | news 2025-07 | fails: weights have no licence; would need the authors' written answer |
+
+Notes:
+- All four put "you are fully accountable for your use of the models" in the README, and say the authors claim no rights over generated content. None states commercial use outright; MIT and Apache-2.0 allow it by their terms.
+- LongCat 1.6 is the newest and the only one still moving. It uses audio-image-to-video with two LoRAs, and offers int8. Needs torch 2.6 (cu124) and flash-attn 2.7.4. Hopper GPUs are named for FlashAttention 3.
+- InfiniteTalk needs torch 2.4.1 (cu121), xformers 0.0.28 and flash-attn 2.7.4. The unquantised 14B base is far larger than 24 GB.
+- OmniAvatar 1.3B would reuse the Wan 1.3B weights we already hold, which is attractive, but its own weights have no licence. Not usable without written permission.
+- Still to check for any chosen model: the licences of each base model it downloads (Wan2.1-I2V-14B-480P, the audio encoders, Whisper, the VAE) and the file sizes.
+
+## Consequence for the spike
+The strict-rule candidates (LongCat-Video-Avatar, InfiniteTalk) are about 14B-parameter models. In bf16 the weights alone are about 27 GB, so they will not run on the free Kaggle T4 (16 GB) except with heavy CPU offload, which is slow and not representative. They are also larger than the g5.2xlarge's 24 GB without int8 or fp8. The spike therefore probably has to run on AWS or a rented GPU, not on Kaggle (see `_plans/04_avatar_model.md`, step B).
