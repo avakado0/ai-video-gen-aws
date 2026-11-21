@@ -71,7 +71,7 @@ Order follows resource dependencies. Gate for every file: `terraform fmt -check`
 
 ## Phase 6: Upgrade and quota (the critical path)
 
-- [ ] H. Manually upgrade to Paid. One-way. Gate: the Credits page still shows the $100 credit, expiry 2027-10-29. Only after phases 3-5 (decision 2026-11-16).
+- [x] H. Manually upgrade to Paid. One-way. Gate: the Credits page still shows the $100 credit, expiry 2027-10-29. Only after phases 3-5 (decision 2026-11-16). Done 2026-11-21. After it the Credits page still showed 3 active credits, all expiring 2027-10-29: the $100 Free Tier credit (about $99.93 left) and two $20 "Explore AWS" activity credits, $139.93 in all.
 - [x] H. Request the Spot quota "All G and VT Spot Instance Requests" in us-west-2: 8 vCPU (one `g4dn.2xlarge`, decision 2026-11-18). Requested 2026-11-20 before the upgrade, status Pending, no Support case yet; the applied value was 0.
 - [x] H. Wait for approval. Approved 2026-11-20 by AWS email: "All G and VT Spot Instance Requests" new limit 8 (one `g4dn.2xlarge`), effective 30 minutes after the email. Do not raise the ASG max size before the upgrade to Paid.
 
