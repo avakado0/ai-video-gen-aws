@@ -68,10 +68,10 @@ Model: Wan 2.1 T2V 1.3B on a Tesla T4. Two quality levels are exposed as a manif
 
 | Level | Size | Steps | 3 s clip |
 |---|---|---|---|
-| `fast` (default) | 640x368 | 20 | about 4.7 min |
-| `high` | 832x480 | 30 | about 15 min |
+| `fast` (default) | 832x480 | 30 | about 13.5 min on the T4 (Kaggle, 808 s); 200 s on a g5.2xlarge (AWS, 2026-11-21) |
+| `high` | 832x480 | 50 | about 21 min on the T4 (Kaggle, 1265 s); about 5 min on a g5.2xlarge (my estimate, not yet measured) |
 
-Resolution, not CPU offload, was the main lever (about 2.2x faster per step at the smaller size). The worker image is 4.16 GB compressed. Weights are 28.9 GB. Rough GPU cost at Spot prices is a few cents per clip (an estimate, not measured on AWS).
+Both levels use Wan's own recommended settings for the 1.3B model (guidance 6, flow_shift 8, Wan's default negative prompt). The first AWS test used flow_shift 3.0, which blew the colours out; plan 05 (`_plans/05_quality_variants.md`) found and fixed that. The 640x368 size of the first spike was dropped: it is below the 480p the model was trained for. Cold start from launch to a ready worker was 6 min 17 s on the g5 (measured). The worker image is 4.16 GB compressed. Weights are 28.9 GB. Rough GPU cost at Spot prices is a few cents per clip (an estimate, not measured on AWS).
 
 ## Cost model
 
