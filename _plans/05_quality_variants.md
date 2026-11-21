@@ -22,6 +22,8 @@ Colour finding (2026-11-21, by eye, owner's observation plus frames extracted fr
 
 Run 1 result (2026-11-21, Kaggle T4, owner ran it): the surfing prompt with the AWS settings is blown out on Kaggle too (flat cyan, orange cat clipped, white burned; mean 179.5, std 108, motion 7.11, 819 s). So the AWS environment (torch 2.8.0, A10G) is not the cause; the prompt or the settings are. No image change is needed for the colour problem. Next runs in this order: 6 (official negative prompt), then 8 with BEST set to the baseline settings (a pure prompt test without "vivid colors" and "bright tropical sun"), then 2, 3, 4.
 
+Run 2 result (2026-11-21, Kaggle T4): flow_shift 8.0 alone, everything else as run 1, fixes the colour. Natural teal water, orange fur with texture, no clipped highlights, more motion. Run 1 (shift 3.0) against run 2 (shift 8.0): mean 179.5 to 128.1, std 108.2 to 78.8, motion 7.11 to 14.22, time 819 s to 808 s. So the wrong `FLOW_SHIFT = 3.0` (from a diffusers 14B docstring) was the main culprit, and the fix is one constant in `worker/wan.py` plus an image rebuild. Still open: the best value in the README range (8 to 12), and whether 50 steps and guidance 6 improve detail. Next: run 4 (README recipe), then run 5 (shift 12) if time allows; runs 6 and 8 matter less now.
+
 What this says:
 - We are below Wan's own defaults on steps and on flow_shift (3.0 against 5.0), and the README recommends higher values for both on this model. The 3.0 came from a diffusers docstring for the 14B model; nobody tuned it (the `worker/wan.py` header says so).
 - `fast` (640x368) is below the 480p the model was trained for. Expect it to be soft however the other knobs are set.
