@@ -46,10 +46,5 @@ Not candidates: MuseTalk and LatentSync (need a video, not a photo), Wav2Lip (co
 - None of the three photo + audio candidates stated a memory figure we can plan around. Only the spike answers that.
 - All three are old (2023 to early 2025). Newer, larger Wan-class avatar models exist but were not read here.
 
-## Open decision for the owner
-The permissive-only filter needs a sharper wording before the spike:
-1. Code licence permissive, and weights not explicitly non-commercial (accept "not stated" for a friends-only, non-commercial portfolio, and say so in the README); or
-2. Both code and weights must carry an explicit MIT or Apache-2.0 grant, which probably leaves nothing; or
-3. Widen to non-commercial licences for the friends-only app (the owner chose against this on 2026-11-21).
-
-Sources (all fetched 2026-11-21): the GitHub READMEs and LICENSE files of OpenTalker/SadTalker, fudan-generative-vision/hallo2, antgroup/echomimic_v2, jixiaozhong/Sonic, and the Hugging Face cards of fudan-generative-ai/hallo2, BadToBest/EchoMimicV2, LeonJoe13/Sonic.
+## Decision (owner, 2026-11-21)
+The plan is to make money from the videos, so the strict rule applies: code, weights and every bundled or base model need a clear commercial grant. The three older photo-driven candidates above do not pass it cleanly. The search moves to newer models (see the second table below once filled in) and to a paid API as a fallback.

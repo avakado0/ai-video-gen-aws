@@ -10,7 +10,7 @@ The first AWS run (2026-11-21, `_effort_logs/2026-11-21_first_gpu_run_on_aws.md`
 2. **Output type:** talking head, lip-synced (face and shoulders, near-still background). Not gestures, not full scenes.
 3. **Audio source:** users upload audio. No text-to-speech, so one model per deployment still holds.
 4. **Face input:** one photo (matches the mock manifest: `face_image` + `audio`). This rules out the video-in models (MuseTalk, LatentSync), which re-sync an existing video.
-5. **Licence:** permissive only (MIT or Apache-2.0), because the repo is a public portfolio. Rules out Wav2Lip and anything non-commercial.
+5. **Licence: commercial-safe, every part.** Decided 2026-11-21 after the owner said the plan is to make money from the videos. Code, weights and every bundled or base model must carry a clear grant that allows commercial use (MIT, Apache-2.0 or an equivalent written grant), and "not stated" does not pass. Rules out Wav2Lip, Sonic, EchoMimic V2 (weights unlicensed, "academic research"), and probably SadTalker and Hallo2 (see `docs/avatar_model_candidates.md`). Consent for faces and voices, and platform AI-labelling rules, matter once clips are published for money; the README says so. The older photo-driven models fail this rule, so the search moves to newer models, including Wan-based ones, and to a paid API as a fallback.
 6. **Max clip length:** 30 s of audio (the mock allows 60 s; lower it).
 7. **Choosing the model:** a free Kaggle T4 spike of 2 to 3 candidates on the same photo and audio, compared by eye, like the Wan spike. No AWS credit spent.
 8. **Wan 1.3B is parked:** keep code, tests and the 29 GB weights in S3 (about $0.65 a month, my estimate); only the deployed manifest and worker switch.
