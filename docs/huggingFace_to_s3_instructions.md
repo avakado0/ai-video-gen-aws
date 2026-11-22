@@ -102,7 +102,7 @@ INSTANCE_ID=$(aws ec2 run-instances --region "$REGION" \
   --key-name hf-migration --security-group-ids "$SG_ID" \
   --iam-instance-profile Name=hf-migration-role \
   --instance-initiated-shutdown-behavior terminate \
-  --block-device-mappings '[{"DeviceName":"/dev/sdf","Ebs":{"VolumeSize":40,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
+  --block-device-mappings '[{"DeviceName":"/dev/sdf","Ebs":{"VolumeSize":60,"VolumeType":"gp3","DeleteOnTermination":true}}]' \
   --query 'Instances[0].InstanceId' --output text)
 
 aws ec2 wait instance-running --region "$REGION" --instance-ids "$INSTANCE_ID"
