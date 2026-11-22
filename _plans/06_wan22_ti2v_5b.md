@@ -169,3 +169,21 @@ The owner applied the Terraform change for the start-image size check (2 added, 
 Reading the code and the repo's file sizes, no AWS call. **My hypothesis, unmeasured:** `ru_maxrss` (the number in the log) counts every page the process has mapped, including memory-mapped weight files. The transformer is stored as five fp32 shards of about 20 GB and loaded as bf16 (about 10 GB). While loading, the mapped shard pages sit in the process's resident size, and the text encoder per job (11.4 GB of bf16 shards) does the same. Such file pages are reclaimable: the kernel drops them under pressure and the container is not killed for them, only for anonymous memory. That would explain why the load peak moved between runs (24.2, 27.1, 27.5, 28.5 GiB) with nothing else changed: it depends on how much of the files the page cache still held. It would also mean the "1 GiB margin" is smaller in appearance than in fact. It does not explain the first OOM kill (exit 137), which happened while the encoder was a real anonymous copy in RAM; that cause is fixed.
 
 What cannot be settled from the logs: how much of the 28.1 GiB is anonymous. So the worker now logs `memory after load`, `memory after prompt encode` and `memory after denoise`, each with the process's anonymous and file pages (`/proc/self/status`) and the container's own counters (`memory.current`, `memory.peak`, anon and file from `memory.stat` in the cgroup, which is what the task limit is enforced on). New module `worker/memory.py`, tests in `tests/worker/test_memory.py`. Needs one image build and push, then one job on a g5 (the next time a GPU runs anyway: about 7 to 13 min for a `fast` clip, about $0.1 to $0.2, my estimate). Decision rule once measured: if container anon peak is well under 29 GiB (say under 24), the margin is fine and nothing changes; if it is near 28, lower it (load the transformer shards one at a time, or drop the page cache after load) before adding load.
+
+### G17 measured (2026-11-22, g5.2xlarge Spot, image `cdb44b91`): the RAM margin is fine
+
+Two jobs in one process, both `fast` 5 s (121 frames): text, then image to video. Both `ok` on attempt 1 (762.7 and 731.9 GPU seconds, 22.3 s per step both; peak GPU 14.6 and 15.9 GiB).
+
+| Moment | Process (anon / file) | Container (anon / file / peak) |
+|---|---|---|
+| after load | 11.2 / 15.9 | 11.2 / 10.5 / 21.8 |
+| job 1, after prompt encode | 11.6 / 6.6 | 11.6 / 15.3 / 27.0 |
+| job 1, after denoise | 13.3 / 0.5 | 13.3 / 14.1 / 27.7 |
+| job 2, after prompt encode | 12.2 / 0.5 | 12.2 / 14.2 / 27.8 |
+| job 2, after denoise | 15.5 / 0.4 | 15.5 / 12.2 / 29.0 |
+
+- **The hypothesis held.** The "peak RAM 27 to 28 GiB" the log has shown since trial 1 is `ru_maxrss` counting memory-mapped weight pages. Real (anonymous) memory is 11 to 16 GiB. The rest of the container's use is file cache (weights read from the NVMe), which the kernel drops under pressure. The container's `memory.peak` reached 29.0 GiB, the limit, because cache fills to the limit; nothing was killed. The exit-137 kill of the first trial was real anonymous memory (the encoder held in RAM) and is fixed.
+- **Margin:** anonymous peak 15.5 GiB against 29: about 13 GiB. Decision rule met (under 24): no change to the task memory or the loading.
+- **Watch item:** anonymous memory after a job's denoise grew from 13.3 (job 1, text) to 15.5 GiB (job 2, image to video). Image jobs hold more (start image, latents, frames), so this is probably the job type, not a leak, but two jobs cannot tell them apart. A run of three or more jobs would; not worth a GPU run alone. The `memory after ...` lines stay in the log, so any later run shows it.
+- **New measurement:** image to video at 5 s `fast` is 22.3 s per step, the same as text at 5 s (the earlier 3 s image-to-video was 11.6 s per step).
+- Cost of the run (my estimate): about 40 min of g5 (cold start, two jobs of about 12.5 min, idle wait), about $0.5.
