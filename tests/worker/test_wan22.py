@@ -400,9 +400,18 @@ def _load(monkeypatch, tmp_path, **generator_kwargs):
     return gen, seen
 
 
-def test_load_uses_bf16_for_the_model_and_fp32_for_the_vae(monkeypatch, tmp_path):
+def test_load_uses_bf16_for_the_model_and_for_the_vae(monkeypatch, tmp_path):
+    # Trial 1 on AWS, 2026-11-22: with an fp32 VAE the decode ran out of memory on the A10G (22.06 GiB
+    # usable): "Tried to allocate 2.60 GiB ... 18.28 GiB is allocated by PyTorch". The decoder holds
+    # 512-channel tensors at 352x640 for several frames plus the frame caches of every layer, all fp32.
+    # bf16 halves that. Both pipelines cast their latents to the VAE's dtype, so nothing else changes.
     _, seen = _load(monkeypatch, tmp_path)
-    assert seen["dtypes"] == {"vae": "float32", "pipeline": "bfloat16"}
+    assert seen["dtypes"] == {"vae": "bfloat16", "pipeline": "bfloat16"}
+
+
+def test_the_vae_dtype_can_be_set_back_to_fp32(monkeypatch, tmp_path):
+    _, seen = _load(monkeypatch, tmp_path, vae_dtype="float32")
+    assert seen["dtypes"]["vae"] == "float32" and seen["dtypes"]["pipeline"] == "bfloat16"
 
 
 def test_load_builds_the_image_pipeline_from_the_same_loaded_parts(monkeypatch, tmp_path):

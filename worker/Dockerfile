@@ -11,7 +11,10 @@ ENV PYTHONUNBUFFERED=1 \
     NVIDIA_DRIVER_CAPABILITIES=compute,utility \
     # Weights come from /data/models (copied from S3 at boot). Never reach out to Hugging Face.
     HF_HUB_OFFLINE=1 \
-    TRANSFORMERS_OFFLINE=1
+    TRANSFORMERS_OFFLINE=1 \
+    # Lets the CUDA allocator grow its memory segments, so fragmentation cannot cause an out of memory
+    # when the GPU is nearly full (the trial 1 error message of plan 06 suggested it).
+    PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
 
 WORKDIR /app
 

@@ -60,3 +60,8 @@ def test_build_script_is_executable_and_checks_the_account():
 def test_pillow_is_pinned_for_the_start_image_crop():
     # The 5B model takes a start image; the worker resizes and crops it with Pillow (plan 06).
     assert "Pillow" in pins()
+
+
+def test_the_cuda_allocator_may_grow_segments_so_fragmentation_cannot_cause_an_out_of_memory():
+    # The out-of-memory message of trial 1 (plan 06) showed 1.98 GiB reserved but unallocated and suggested this.
+    assert "PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True" in DOCKERFILE

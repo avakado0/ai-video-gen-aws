@@ -65,8 +65,23 @@ tiny = WanPipeline(tokenizer=tokenizer, text_encoder=text_encoder, vae=vae, sche
                    transformer=transformer, transformer_2=None, boundary_ratio=None, expand_timesteps=True)
 
 # Make the REAL Wan22Generator.load() run against the tiny pipeline: from_pretrained returns it, offload is a no-op.
-WanPipeline.from_pretrained = classmethod(lambda cls, path, vae=None, torch_dtype=None: tiny)
-AutoencoderKLWan.from_pretrained = classmethod(lambda cls, *a, **k: vae)
+# load() asks for bf16 (model and VAE, plan 06 trial 1). The check records what was asked and keeps the tensors in
+# fp32: a CPU runs bf16 convolutions extremely slowly (minutes per job), and this check is about wiring.
+ASKED = {}
+
+
+def _pipe_from_pretrained(cls, path, vae=None, torch_dtype=None):
+    ASKED["pipeline"] = str(torch_dtype)
+    return tiny
+
+
+def _vae_from_pretrained(cls, path, subfolder=None, torch_dtype=None):
+    ASKED["vae"] = str(torch_dtype)
+    return vae
+
+
+WanPipeline.from_pretrained = classmethod(_pipe_from_pretrained)
+AutoencoderKLWan.from_pretrained = classmethod(_vae_from_pretrained)
 WanPipeline.enable_model_cpu_offload = lambda self: None
 WanImageToVideoPipeline.enable_model_cpu_offload = lambda self: None
 torch.cuda.reset_peak_memory_stats = lambda: None
@@ -79,6 +94,8 @@ wan22.FRAMES = {"3": 9, "5": 13}
 
 gen = wan22.Wan22Generator("/nonexistent", "wan2-2-ti2v-5b", steps=2)
 gen.load()
+print("load() asked for:", ASKED)
+assert ASKED == {"pipeline": "torch.bfloat16", "vae": "torch.bfloat16"}, ASKED
 print("load() ok; image pipe built from shared parts:", gen.image_pipe.transformer is gen.pipe.transformer,
       "expand_timesteps", gen.image_pipe.config.expand_timesteps, flush=True)
 
