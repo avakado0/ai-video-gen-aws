@@ -41,7 +41,8 @@ def test_every_size_is_a_multiple_of_16():
 def test_every_manifest_quality_has_a_preset():
     import json
     import pathlib
-    manifest = json.loads((pathlib.Path(wan.__file__).parents[1] / "model_manifest.json").read_text())
+    # The parked 1.3B path is checked against its own manifest (plan 06 made the 5B file the live one).
+    manifest = json.loads((pathlib.Path(wan.__file__).parents[1] / "model_manifest.wan2-1.json").read_text())
     values = next(p["values"] for p in manifest["params"] if p["name"] == "quality")
     assert sorted(values) == sorted(wan.QUALITY)
 

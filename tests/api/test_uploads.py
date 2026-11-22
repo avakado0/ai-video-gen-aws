@@ -97,6 +97,7 @@ def test_missing_or_mistyped_fields_are_400(call, body):
 
 
 def test_a_text_only_model_has_no_slots(call, use_manifest):
-    use_manifest(json.loads((ROOT / "model_manifest.json").read_text()))
+    # The parked Wan 2.1 manifest is the text-only one now; the live 5B manifest has an image slot.
+    use_manifest(json.loads((ROOT / "model_manifest.wan2-1.json").read_text()))
 
     assert upload(call).status == 400

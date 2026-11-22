@@ -9,6 +9,7 @@ from common import manifest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 V1 = ROOT / "model_manifest.json"
+WAN21 = ROOT / "model_manifest.wan2-1.json"
 MOCKS = sorted((ROOT / "frontend/js/mock/manifests").glob("*.json"))
 
 
@@ -34,10 +35,22 @@ def test_v1_manifest_is_valid():
     assert manifest.validate(load_v1()) == []
 
 
-def test_v1_is_text_to_video_with_four_params():
+def test_the_live_manifest_is_wan_2_2_5b_with_four_params_and_an_optional_start_image():
     m = load_v1()
+    assert m["model"] == "wan2-2-ti2v-5b"
     assert m.get("prompt", "required") == "required"
-    assert m["inputs"] == []
+    assert len(m["inputs"]) == 1
+    image = m["inputs"][0]
+    assert image["name"] == "image" and image["kind"] == "image" and image["required"] is False
+    assert image["mime"] == ["image/png", "image/jpeg"] and image["max_bytes"] == 10 * 1024 * 1024
+    assert image.get("max_files", 1) == 1
+    assert [p["name"] for p in m["params"]] == ["seed", "duration_seconds", "quality", "negative_prompt"]
+
+
+def test_the_parked_wan_2_1_manifest_is_still_valid_and_text_only():
+    m = json.loads(WAN21.read_text())
+    assert manifest.validate(m) == []
+    assert m["model"] == "wan2-1-t2v-1-3b" and m["inputs"] == []
     assert [p["name"] for p in m["params"]] == ["seed", "duration_seconds", "quality", "negative_prompt"]
 
 
