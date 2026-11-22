@@ -95,10 +95,15 @@ resource "aws_autoscaling_group" "gpu" {
 
       # Wan 2.2 5B needs a 24 GB GPU (plan 06), so the 16 GB T4 of the g4dn.2xlarge is out. The
       # g5.2xlarge has an A10G (24 GB), 8 vCPU and 32 GB RAM. The g6.2xlarge (L4, 24 GB, same
-      # vCPU and RAM) joins in a second change, after trial 1 has shown the model works here.
-      # One type means no Spot diversity: if g5 capacity is short, jobs wait.
+      # vCPU and RAM) joined in a second change, after trial 1 (2026-11-22) showed the model
+      # works on the g5. The L4's speed per step is unmeasured; price-capacity-optimized picks
+      # whichever type is cheap and available, so a run may land on either.
       override {
         instance_type = "g5.2xlarge"
+      }
+
+      override {
+        instance_type = "g6.2xlarge"
       }
     }
   }
