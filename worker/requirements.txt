@@ -22,3 +22,7 @@ boto3==1.44.3
 # Comes in through transformers. Pinned to 0.36.2, the version the Kaggle spike and the built image both
 # resolved, so a rebuild cannot pick up an untested release.
 huggingface-hub==0.36.2
+# Resizes and crops the start image for image-to-video (plan 06). 12.3.0 is the newest 12.x; 13.0.0
+# (2026-10-16) is a new major release and diffusers 0.35.2 was not checked against it, the same
+# reasoning as for transformers 5.x above. Looked up on PyPI on 2026-11-22.
+Pillow==12.3.0

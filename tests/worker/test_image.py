@@ -55,3 +55,8 @@ def test_build_script_is_executable_and_checks_the_account():
     text = script.read_text()
     assert "477656043770" in text and "AWS_PROFILE" in text
     assert "--platform linux/amd64" in text
+
+
+def test_pillow_is_pinned_for_the_start_image_crop():
+    # The 5B model takes a start image; the worker resizes and crops it with Pillow (plan 06).
+    assert "Pillow" in pins()
