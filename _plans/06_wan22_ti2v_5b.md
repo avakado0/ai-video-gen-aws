@@ -149,3 +149,9 @@ Two jobs in one worker process, both `fast`: a 5 s text clip, then a 3 s image-t
 - **Cost of this run:** about $0.45 (my estimate). Trial 1 in total: about $1.8 to $2 over four runs (my estimate); the Billing console has the real number.
 - **Owner's verdict:** the clips are okay. Decision: the 1.3B weights are deleted from S3 by the owner; `g6.2xlarge` is added next, with one confirmation run.
 - **1.3B weights deleted from S3 by the owner, 2026-11-22.** Checked afterwards: `models/` holds only `wan2-2-ti2v-5b/`, 21 objects, 34,201,420,260 bytes, the same as the verified copy. Every boot now copies 34 GB instead of 63 GB. Next: add `g6.2xlarge` (Terraform), one confirmation run.
+
+## Trial 1, extra jobs (2026-11-22, owner's own jobs on the same g5 instance)
+
+- **`high` 5 s text clip (50 steps): 1209.6 GPU seconds** (about 20 min), peak GPU 14.6 GiB, RAM 28.1 GiB, same peaks as `fast`. About $0.27 of Spot compute (my estimate at about $0.8 an hour). My earlier figure of 18.6 min was a little low.
+- **`stale` outcome seen:** a job the owner cancelled on the site before the worker took it: the worker found the `.pending` marker gone, deleted the message and used 0.0 GPU seconds (the spec's behaviour).
+- **`failed` outcome seen:** a job whose start image had a shorter side under 512 px. The worker rejected it in 0.4 s with `invalid_input`, field `image`, and the site showed "The starting image is too small: its shorter side must be at least 512 pixels." The check worked, but it only happens after the job reaches the worker: on a cold start that is about 9 min of waiting and boot cost for a refusal. Open: check the pixel size in the browser before the upload (and publish the minimum in the manifest).
