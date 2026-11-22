@@ -70,6 +70,7 @@ def test_importing_the_module_needs_no_torch_and_no_pillow():
 # --- fakes ---------------------------------------------------------------------------------
 
 def _install_fake_torch(monkeypatch, calls):
+    import contextlib
     torch = types.ModuleType("torch")
     torch.Generator = lambda device: types.SimpleNamespace(manual_seed=lambda s: None)
     torch.cuda = types.SimpleNamespace(
@@ -77,14 +78,27 @@ def _install_fake_torch(monkeypatch, calls):
         reset_peak_memory_stats=lambda: calls.append("reset_peak"),
         max_memory_allocated=lambda: 5 * 2**30,      # a fake GPU that peaked at 5 GiB
     )
+    torch.no_grad = contextlib.nullcontext
     torch.float32, torch.bfloat16 = "float32", "bfloat16"
     utils = types.ModuleType("diffusers.utils")
     utils.export_to_video = lambda *a, **k: None
     diffusers = types.ModuleType("diffusers")
     diffusers.utils = utils
+    # The prompt encoder is loaded on demand, for each job, and dropped before denoising (plan 06).
+    transformers = types.ModuleType("transformers")
+    transformers.loads = []
+
+    def load_encoder(path, torch_dtype=None, device_map=None):
+        transformers.loads.append((path, torch_dtype, device_map))
+        calls.append("load_encoder")
+        return "ENCODER"
+
+    transformers.UMT5EncoderModel = types.SimpleNamespace(from_pretrained=load_encoder)
     monkeypatch.setitem(sys.modules, "torch", torch)
     monkeypatch.setitem(sys.modules, "diffusers", diffusers)
     monkeypatch.setitem(sys.modules, "diffusers.utils", utils)
+    monkeypatch.setitem(sys.modules, "transformers", transformers)
+    return transformers
 
 
 class FakePipe:
@@ -92,9 +106,17 @@ class FakePipe:
 
     def __init__(self, name, log):
         self.name, self.log, self.kwargs, self.calls = name, log, None, 0
+        self.text_encoder, self.encoder_when_run, self.encoded = None, "never run", None
+
+    def encode_prompt(self, **kw):
+        self.encoded = kw
+        self.encoder_at_encode = self.text_encoder
+        self.log.append("encode")
+        return "EMB_P", ("EMB_N" if kw["do_classifier_free_guidance"] else None)
 
     def __call__(self, **kw):
         self.kwargs, self.calls = kw, self.calls + 1
+        self.encoder_when_run = self.text_encoder
         self.log.append(f"run_{self.name}")
         return types.SimpleNamespace(frames=[[]])
 
@@ -107,10 +129,11 @@ class FakePipe:
 
 def _gen(monkeypatch, tmp_path, **kw):
     log = []
-    _install_fake_torch(monkeypatch, log)
+    transformers = _install_fake_torch(monkeypatch, log)
     gen = wan22.Wan22Generator(tmp_path, "m", **kw)
     gen.pipe, gen.image_pipe = FakePipe("text", log), FakePipe("image", log)
     gen._offloaded = gen.pipe
+    gen.transformers = transformers      # for the tests that look at how the encoder was loaded
     return gen, log
 
 
@@ -161,19 +184,19 @@ def test_guidance_of_zero_is_honoured_not_replaced_by_the_default(monkeypatch, t
 def test_no_negative_prompt_from_the_job_means_wans_official_default(monkeypatch, tmp_path):
     gen, _ = _gen(monkeypatch, tmp_path)
     gen.generate(_job(), {}, lambda: False, tmp_path)
-    assert gen.pipe.kwargs["negative_prompt"] == wan.DEFAULT_NEGATIVE_PROMPT
+    assert gen.pipe.encoded["negative_prompt"] == wan.DEFAULT_NEGATIVE_PROMPT
 
 
 def test_the_job_prompt_replaces_the_default_it_is_not_added_to_it(monkeypatch, tmp_path):
     gen, _ = _gen(monkeypatch, tmp_path)
     gen.generate(_job(negative_prompt="blurry"), {}, lambda: False, tmp_path)
-    assert gen.pipe.kwargs["negative_prompt"] == "blurry"
+    assert gen.pipe.encoded["negative_prompt"] == "blurry"
 
 
 def test_the_default_negative_prompt_can_be_set_on_the_generator(monkeypatch, tmp_path):
     gen, _ = _gen(monkeypatch, tmp_path, default_negative_prompt="oversaturated")
     gen.generate(_job(negative_prompt=""), {}, lambda: False, tmp_path)
-    assert gen.pipe.kwargs["negative_prompt"] == "oversaturated"
+    assert gen.pipe.encoded["negative_prompt"] == "oversaturated"
 
 
 # --- abort frees the GPU (same cleanup as wan.py, found by the Kaggle spike) ----------------
@@ -271,7 +294,7 @@ def test_a_job_with_an_image_runs_the_image_pipeline_with_the_fitted_image(monke
     kw = gen.image_pipe.kwargs
     assert kw["image"].size == (1280, 704)
     assert (kw["width"], kw["height"], kw["num_inference_steps"], kw["num_frames"]) == (1280, 704, 30, 73)
-    assert kw["guidance_scale"] == 5.0 and kw["negative_prompt"] == wan.DEFAULT_NEGATIVE_PROMPT
+    assert kw["guidance_scale"] == 5.0 and gen.pipe.encoded["negative_prompt"] == wan.DEFAULT_NEGATIVE_PROMPT
 
 
 def test_an_empty_image_slot_means_text_to_video(monkeypatch, tmp_path):
@@ -306,6 +329,77 @@ def test_after_an_image_job_the_image_pipelines_hooks_are_freed(monkeypatch, tmp
     start = _png(tmp_path / "s.png", (1280, 704))
     gen.generate(_job(), {"image": [start]}, lambda: False, tmp_path)
     assert "free_image" in log and "free_text" not in log
+
+
+# --- the prompt encoder lives only while it encodes (host RAM, trial 1: the container was killed at 29 GiB) ----
+
+def test_the_prompt_encoder_is_loaded_for_each_job_straight_to_the_gpu_in_bf16(monkeypatch, tmp_path):
+    gen, log = _gen(monkeypatch, tmp_path)
+    gen.generate(_job(), {}, lambda: False, tmp_path)
+    gen.generate(_job(), {}, lambda: False, tmp_path)
+    path = str(tmp_path / "m" / "text_encoder")
+    assert gen.transformers.loads == [(path, "bfloat16", "cuda")] * 2
+
+
+def test_the_encoder_is_gone_from_the_pipeline_before_denoising_starts(monkeypatch, tmp_path):
+    gen, log = _gen(monkeypatch, tmp_path)
+    gen.generate(_job(), {}, lambda: False, tmp_path)
+    assert gen.pipe.encoder_at_encode == "ENCODER"        # it was there while encoding
+    assert gen.pipe.encoder_when_run is None              # and not while the pipeline ran
+    assert gen.pipe.text_encoder is None
+    assert log.index("load_encoder") < log.index("encode") < log.index("run_text")
+
+
+def test_the_pipeline_gets_embeddings_not_the_prompt(monkeypatch, tmp_path):
+    gen, _ = _gen(monkeypatch, tmp_path)
+    gen.generate(_job(prompt="a very private cat"), {}, lambda: False, tmp_path)
+    kw = gen.pipe.kwargs
+    assert (kw["prompt_embeds"], kw["negative_prompt_embeds"]) == ("EMB_P", "EMB_N")
+    assert "prompt" not in kw and "negative_prompt" not in kw
+    assert gen.pipe.encoded["prompt"] == "a very private cat" and gen.pipe.encoded["max_sequence_length"] == 512
+
+
+def test_without_guidance_there_is_no_negative_prompt_to_encode(monkeypatch, tmp_path):
+    # The pipelines only use the negative prompt when guidance_scale is above 1.
+    gen, _ = _gen(monkeypatch, tmp_path, guidance=1.0)
+    gen.generate(_job(), {}, lambda: False, tmp_path)
+    assert gen.pipe.encoded["do_classifier_free_guidance"] is False
+    assert gen.pipe.kwargs["negative_prompt_embeds"] is None
+
+
+def test_an_image_job_is_encoded_by_the_text_pipeline_and_run_by_the_image_pipeline(monkeypatch, tmp_path):
+    gen, log = _gen(monkeypatch, tmp_path)
+    start = _png(tmp_path / "s.png", (1280, 704))
+    gen.generate(_job(), {"image": [start]}, lambda: False, tmp_path)
+    assert gen.pipe.encoded is not None and gen.pipe.calls == 0
+    assert gen.image_pipe.kwargs["prompt_embeds"] == "EMB_P" and "prompt" not in gen.image_pipe.kwargs
+
+
+def test_the_encoder_is_dropped_even_when_encoding_fails(monkeypatch, tmp_path):
+    gen, log = _gen(monkeypatch, tmp_path)
+
+    def failing(**kw):
+        raise RuntimeError("CUDA out of memory")
+
+    gen.pipe.encode_prompt = failing
+    with pytest.raises(RuntimeError):
+        gen.generate(_job(), {}, lambda: False, tmp_path)
+    assert gen.pipe.text_encoder is None
+
+
+def test_a_job_aborted_before_it_starts_does_not_even_load_the_encoder(monkeypatch, tmp_path):
+    gen, _ = _gen(monkeypatch, tmp_path)
+    with pytest.raises(Aborted):
+        gen.generate(_job(), {}, lambda: True, tmp_path)
+    assert gen.transformers.loads == []
+
+
+def test_a_bad_start_image_does_not_load_the_encoder_either(monkeypatch, tmp_path):
+    gen, _ = _gen(monkeypatch, tmp_path)
+    tiny = _png(tmp_path / "tiny.png", (100, 100))
+    with pytest.raises(PermanentJobError):
+        gen.generate(_job(), {"image": [tiny]}, lambda: False, tmp_path)
+    assert gen.transformers.loads == []
 
 
 # --- logging -------------------------------------------------------------------------------
@@ -357,12 +451,13 @@ def _load(monkeypatch, tmp_path, **generator_kwargs):
 
     class TextPipe:
         scheduler = types.SimpleNamespace(config={})
-        tokenizer, text_encoder, vae, transformer, transformer_2 = "tok", "te", None, "tr", None
+        tokenizer, text_encoder, vae, transformer, transformer_2 = "tok", None, None, "tr", None
         config = types.SimpleNamespace(boundary_ratio=None, expand_timesteps=True)
 
         @classmethod
-        def from_pretrained(cls, path, vae=None, torch_dtype=None):
+        def from_pretrained(cls, path, vae=None, text_encoder="not passed", torch_dtype=None):
             seen["dtypes"]["pipeline"] = torch_dtype
+            seen["text_encoder_passed"] = text_encoder
             pipe = cls()
             pipe.vae = vae
             seen["text"] = pipe
@@ -417,7 +512,7 @@ def test_the_vae_dtype_can_be_set_back_to_fp32(monkeypatch, tmp_path):
 def test_load_builds_the_image_pipeline_from_the_same_loaded_parts(monkeypatch, tmp_path):
     gen, seen = _load(monkeypatch, tmp_path)
     kw = seen["image_kwargs"]
-    assert kw["vae"] is seen["vae"] and kw["transformer"] == "tr" and kw["text_encoder"] == "te"
+    assert kw["vae"] is seen["vae"] and kw["transformer"] == "tr" and kw["text_encoder"] is None
     assert kw["tokenizer"] == "tok" and kw["scheduler"] == "scheduler"
     assert kw["expand_timesteps"] is True
     assert gen.pipe is seen["text"] and gen.image_pipe is not gen.pipe
@@ -466,3 +561,10 @@ def test_load_logs_how_much_ram_the_loaded_model_takes(monkeypatch, tmp_path, ca
     _load(monkeypatch, tmp_path)
     assert any("model loaded" in r.getMessage() and "RAM" in r.getMessage() and "GiB" in r.getMessage()
                for r in caplog.records)
+
+
+def test_load_does_not_load_the_text_encoder_at_all(monkeypatch, tmp_path):
+    # 11.4 GB of host RAM that nothing needs while denoising. Passing None makes diffusers skip it.
+    gen, seen = _load(monkeypatch, tmp_path)
+    assert seen["text_encoder_passed"] is None
+    assert seen["image_kwargs"]["text_encoder"] is None

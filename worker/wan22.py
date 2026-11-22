@@ -13,6 +13,13 @@ first one's hooks. The generator therefore moves the hooks only when the kind of
 The start image is resized to cover 1280x704 and centre-cropped by us. The pipeline's own resize
 would stretch it.
 
+The prompt encoder (UMT5, 11.4 GB) is not kept in memory. Trial 1 on AWS (2026-11-22) had the
+container killed at its 29 GiB RAM limit while denoising a second job: weights in RAM were the
+transformer, the VAE and this encoder, all idle but the transformer. Each job now loads the encoder
+straight to the GPU (it is free then: the transformer is still on the CPU), encodes the prompt and
+the negative prompt, and drops the encoder before denoising starts. The pipelines take the
+embeddings instead of the text.
+
 Not run on a GPU yet. That the image pipeline accepts this wiring (read from diffusers 0.35.2's
 source, not executed) is what trial 1(c) on AWS shows.
 
@@ -37,6 +44,7 @@ FLOW_SHIFT = 5.0                           # Wan's `sample_shift` for the 5B mod
 FRAMES = {"3": 73, "5": 121}               # 24 fps, and the model needs 4n+1 frames
 IMAGE_SLOT = "image"                       # the manifest's optional start-image slot
 MIN_IMAGE_SIDE = 512                       # the shorter side of the start image, in pixels
+ENCODER_MAX_LENGTH = 512                   # tokens, what the pipelines' own call uses
 
 
 def _peak_ram_gib():
@@ -94,7 +102,7 @@ def fit_image(path):
 
 class Wan22Generator(Generator):
     def __init__(self, models_dir, model_name, steps=None, guidance=None, flow_shift=None,
-                 default_negative_prompt=None, vae_dtype=None):
+                 default_negative_prompt=None, vae_dtype=None, device="cuda"):
         self.path = str(pathlib.Path(models_dir) / model_name)
         # None for each: the module default (or the quality preset) decides.
         self.steps = steps
@@ -102,6 +110,7 @@ class Wan22Generator(Generator):
         self.flow_shift = flow_shift
         self.default_negative_prompt = default_negative_prompt   # None: DEFAULT_NEGATIVE_PROMPT
         self.vae_dtype = vae_dtype      # None: bf16 (see load)
+        self.device = device            # where the prompt encoder is loaded for each job
         self.pipe = None            # text to video
         self.image_pipe = None      # image to video, same weights
         self._offloaded = None      # whichever pipeline holds the CPU-offload hooks right now
@@ -119,12 +128,13 @@ class Wan22Generator(Generator):
 
         vae_dtype = torch.bfloat16 if self.vae_dtype is None else self.vae_dtype
         vae = AutoencoderKLWan.from_pretrained(self.path, subfolder="vae", torch_dtype=vae_dtype)
-        pipe = WanPipeline.from_pretrained(self.path, vae=vae, torch_dtype=torch.bfloat16)
+        # text_encoder=None: diffusers skips it. It is loaded for each job instead (see _encode_prompt).
+        pipe = WanPipeline.from_pretrained(self.path, vae=vae, text_encoder=None, torch_dtype=torch.bfloat16)
         flow_shift = FLOW_SHIFT if self.flow_shift is None else self.flow_shift
         pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config, flow_shift=flow_shift)
         # Built from named parts: `pipe.components` leaves the transformer out (diffusers 0.35.2).
         image_pipe = WanImageToVideoPipeline(
-            tokenizer=pipe.tokenizer, text_encoder=pipe.text_encoder, vae=pipe.vae,
+            tokenizer=pipe.tokenizer, text_encoder=None, vae=pipe.vae,
             scheduler=pipe.scheduler, transformer=pipe.transformer, transformer_2=pipe.transformer_2,
             boundary_ratio=pipe.config.boundary_ratio, expand_timesteps=True)
         pipe.enable_model_cpu_offload()
@@ -153,6 +163,27 @@ class Wan22Generator(Generator):
         self._offloaded.maybe_free_model_hooks()
         gc.collect()
         torch.cuda.empty_cache()
+
+    def _encode_prompt(self, prompt, negative_prompt, with_negative):
+        """Embeddings for the prompt (and the negative prompt when guidance uses it). The encoder is
+        loaded straight to the device, used, and dropped, so it never sits in host RAM and is gone
+        before denoising starts, whatever happens."""
+        import torch
+        from transformers import UMT5EncoderModel
+
+        encoder = UMT5EncoderModel.from_pretrained(
+            f"{self.path}/text_encoder", torch_dtype=torch.bfloat16, device_map=self.device)
+        self.pipe.text_encoder = encoder
+        try:
+            with torch.no_grad():
+                return self.pipe.encode_prompt(
+                    prompt=prompt, negative_prompt=negative_prompt, do_classifier_free_guidance=with_negative,
+                    max_sequence_length=ENCODER_MAX_LENGTH, device=self.device, dtype=torch.bfloat16)
+        finally:
+            self.pipe.text_encoder = None
+            del encoder
+            gc.collect()
+            torch.cuda.empty_cache()
 
     def _use(self, pipe):
         """Give the offload hooks to `pipe`, only if another pipeline has them."""
@@ -189,13 +220,18 @@ class Wan22Generator(Generator):
                 log.info("step %d/%d", done, total_steps)
             return callback_kwargs
 
+        guidance = GUIDANCE_SCALE if self.guidance is None else self.guidance
+        negative_prompt = job.params.get("negative_prompt") or self.default_negative_prompt or DEFAULT_NEGATIVE_PROMPT
+        # The pipelines use the negative prompt only when guidance_scale is above 1.
+        prompt_embeds, negative_prompt_embeds = self._encode_prompt(job.prompt, negative_prompt, guidance > 1.0)
+
         kwargs = dict(
-            prompt=job.prompt,
-            negative_prompt=job.params.get("negative_prompt") or self.default_negative_prompt or DEFAULT_NEGATIVE_PROMPT,
+            prompt_embeds=prompt_embeds,
+            negative_prompt_embeds=negative_prompt_embeds,
             width=width, height=height,
             num_frames=frame_count,
             num_inference_steps=total_steps,
-            guidance_scale=GUIDANCE_SCALE if self.guidance is None else self.guidance,
+            guidance_scale=guidance,
             generator=torch.Generator("cpu").manual_seed(seed),
             callback_on_step_end=on_step,
         )

@@ -64,24 +64,12 @@ scheduler = UniPCMultistepScheduler.from_config(cfg("scheduler/scheduler_config.
 tiny = WanPipeline(tokenizer=tokenizer, text_encoder=text_encoder, vae=vae, scheduler=scheduler,
                    transformer=transformer, transformer_2=None, boundary_ratio=None, expand_timesteps=True)
 
-# Make the REAL Wan22Generator.load() run against the tiny pipeline: from_pretrained returns it, offload is a no-op.
-# load() asks for bf16 (model and VAE, plan 06 trial 1). The check records what was asked and keeps the tensors in
-# fp32: a CPU runs bf16 convolutions extremely slowly (minutes per job), and this check is about wiring.
-ASKED = {}
-
-
-def _pipe_from_pretrained(cls, path, vae=None, torch_dtype=None):
-    ASKED["pipeline"] = str(torch_dtype)
-    return tiny
-
-
-def _vae_from_pretrained(cls, path, subfolder=None, torch_dtype=None):
-    ASKED["vae"] = str(torch_dtype)
-    return vae
-
-
-WanPipeline.from_pretrained = classmethod(_pipe_from_pretrained)
-AutoencoderKLWan.from_pretrained = classmethod(_vae_from_pretrained)
+# Save the tiny pipeline as a model folder, then run the REAL Wan22Generator.load() on it: the real
+# from_pretrained calls (text_encoder=None, bf16), the image pipeline built from the loaded parts, and, per job,
+# the real on-demand UMT5 encoder load. Only things a CPU cannot do are patched out.
+models = pathlib.Path(tempfile.mkdtemp())
+tiny.save_pretrained(str(models / "wan2-2-ti2v-5b"))
+del tiny, vae, text_encoder
 WanPipeline.enable_model_cpu_offload = lambda self: None
 WanImageToVideoPipeline.enable_model_cpu_offload = lambda self: None
 torch.cuda.reset_peak_memory_stats = lambda: None
@@ -92,12 +80,16 @@ torch.cuda.empty_cache = lambda: None
 wan22.WIDTH, wan22.HEIGHT = 128, 96
 wan22.FRAMES = {"3": 9, "5": 13}
 
-gen = wan22.Wan22Generator("/nonexistent", "wan2-2-ti2v-5b", steps=2)
+# device="cpu": the encoder is loaded there instead of on the GPU. vae_dtype=float32: a CPU runs bf16 convolutions
+# extremely slowly (minutes per job), and this check is about wiring; the unit tests pin bf16 as the default.
+gen = wan22.Wan22Generator(models, "wan2-2-ti2v-5b", steps=2, device="cpu", vae_dtype=torch.float32)
 gen.load()
-print("load() asked for:", ASKED)
-assert ASKED == {"pipeline": "torch.bfloat16", "vae": "torch.bfloat16"}, ASKED
-print("load() ok; image pipe built from shared parts:", gen.image_pipe.transformer is gen.pipe.transformer,
-      "expand_timesteps", gen.image_pipe.config.expand_timesteps, flush=True)
+vae = gen.pipe.vae
+print("load() ok. text encoder not loaded:", gen.pipe.text_encoder is None and gen.image_pipe.text_encoder is None,
+      "| image pipe shares the transformer:", gen.image_pipe.transformer is gen.pipe.transformer,
+      "| transformer dtype:", gen.pipe.transformer.dtype, flush=True)
+assert gen.pipe.text_encoder is None and gen.image_pipe.text_encoder is None
+assert gen.pipe.transformer.dtype == torch.bfloat16
 
 tmp = pathlib.Path(tempfile.mkdtemp())
 job = types.SimpleNamespace(prompt="a cat on a surfboard", params={"duration_seconds": "3", "quality": "fast", "seed": 1})
@@ -110,6 +102,7 @@ def run(label, inputs=None, duration="3"):
     t = time.time()
     path = gen.generate(j, inputs or {}, lambda: False, out)
     frames = imageio.mimread(str(path), memtest=False)
+    assert gen.pipe.text_encoder is None, "the prompt encoder should be dropped after the job"
     print(f"{label}: ok, {len(frames)} frames of {frames[0].shape[1]}x{frames[0].shape[0]}, {time.time() - t:.1f}s", flush=True)
 
 
