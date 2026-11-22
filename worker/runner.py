@@ -7,6 +7,7 @@ Outcomes, as written to the usage log:
   released   Spot notice or SIGTERM: message handed back at once for another worker
   failed     the job can never succeed: `.failed` marker written, message deleted
   error      anything unexpected: message handed back; the queue's redrive policy ends endless retries
+  gave_up    an unexpected error on the third receive or later: `.failed` marker written, message deleted
   bad_message  could not even read whose job it is: message deleted
 """
 import logging
@@ -20,6 +21,12 @@ from .job import Job
 from .watcher import JobWatcher
 
 log = logging.getLogger("worker.runner")
+
+# An unexpected error on this receive or later ends the job instead of handing it back. Trial 1 of
+# plan 06 showed a deterministic error running a 7 minute job again and again; the queue's own limit
+# of 8 receives would have meant about an hour of GPU. Spot releases count as receives too.
+GIVE_UP_AFTER_RECEIVES = 3
+GAVE_UP = PermanentJobError("internal", "The job could not be completed.")   # same text as the DLQ Lambda
 
 
 class Worker:
@@ -58,8 +65,12 @@ class Worker:
         try:
             outcome = self._attempt(message, job)
         except Exception:
-            log.exception("job %s failed unexpectedly; handing it back", job.job_id)
-            self._release(message)
+            if job.receive_count >= GIVE_UP_AFTER_RECEIVES:
+                log.exception("job %s failed unexpectedly on receive %d; giving up", job.job_id, job.receive_count)
+                outcome = self._give_up(message, job)
+            else:
+                log.exception("job %s failed unexpectedly; handing it back", job.job_id)
+                self._release(message)
         finally:
             self.log_usage("job_attempt", sub=job.sub, job_id=job.job_id, attempt=job.receive_count,
                            instance_type=self.instance_type(), quality=job.params.get("quality"),
@@ -126,6 +137,18 @@ class Worker:
         self.store.put_failed(job.sub, job.job_id, error.to_json())
         self._finish(message, job)
         return "failed"
+
+    def _give_up(self, message, job):
+        """Tell the user, then drop the message. If the marker cannot be written the message goes back
+        instead: a job must not vanish without the user hearing why."""
+        try:
+            self.store.put_failed(job.sub, job.job_id, GAVE_UP.to_json())
+        except Exception:
+            log.exception("could not write the failed marker of job %s; handing it back", job.job_id)
+            self._release(message)
+            return "error"
+        self._finish(message, job)
+        return "gave_up"
 
     def _finish(self, message, job):
         """The job is over for good: delete its message and whatever was uploaded for it."""

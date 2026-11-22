@@ -303,6 +303,72 @@ def test_retry_counts_attempts_from_the_receive_count(env):
     assert [u["attempt"] for u in env.usage] == [1, 2]
 
 
+# --- giving up on a job that keeps failing (plan 06, trial 1: one doomed job ran 3 times) -------
+
+def _always_fails(env, message="CUDA out of memory"):
+    def script(should_abort, out_dir):
+        raise RuntimeError(message)
+
+    env.generator.script = script
+
+
+def test_the_third_unexpected_error_gives_up_with_a_failed_marker_and_no_more_retries(env):
+    _always_fails(env)
+    env.submit()
+    assert [env.run_one(), env.run_one(), env.run_one()] == ["error", "error", "gave_up"]
+    assert env.counts() == (0, 0)                      # the message is gone: no fourth attempt
+    failed = json.loads(env.aws.s3.get_object(Bucket=env.aws.bucket, Key=f"clips/{SUB}/{JOB_ID}.failed")["Body"].read())
+    assert failed == {"code": "internal", "message": "The job could not be completed."}
+    assert [u["outcome"] for u in env.usage] == ["error", "error", "gave_up"]
+    assert [u["attempt"] for u in env.usage] == [1, 2, 3]
+    assert env.protection.calls == ["protect", "release"] * 3
+
+
+def test_the_marker_of_a_job_that_gave_up_leaks_nothing_of_the_error(env):
+    _always_fails(env, "CUDA out of memory in /app/worker/wan22.py for a very private cat")
+    env.submit()
+    for _ in range(3):
+        env.run_one()
+    body = env.aws.s3.get_object(Bucket=env.aws.bucket, Key=f"clips/{SUB}/{JOB_ID}.failed")["Body"].read().decode()
+    assert "CUDA" not in body and "private" not in body and "/app" not in body
+
+
+def test_the_first_two_errors_still_retry_and_write_nothing(env):
+    _always_fails(env)
+    env.submit()
+    env.run_one()
+    env.run_one()
+    assert env.counts() == (1, 0)
+    assert f"clips/{SUB}/{JOB_ID}.failed" not in env.keys()
+
+
+def test_receives_that_were_spot_releases_count_toward_the_cap(env):
+    # The receive count does not know why a message came back. A job released twice and then failing once
+    # gives up: rare, and a failing job should not be able to hide behind interruptions.
+    def interrupted(should_abort, out_dir):
+        raise Aborted()
+
+    env.generator.script = interrupted
+    env.submit()
+    assert [env.run_one(), env.run_one()] == ["released", "released"]
+    _always_fails(env)
+    assert env.run_one() == "gave_up"
+
+
+def test_if_the_marker_cannot_be_written_the_message_goes_back_instead_of_being_lost(env):
+    _always_fails(env)
+    env.submit()
+    env.run_one()
+    env.run_one()
+
+    def broken(*a, **k):
+        raise RuntimeError("s3 down")
+
+    env.worker.store.put_failed = broken
+    assert env.run_one() == "error"
+    assert env.counts() == (1, 0)
+
+
 def test_bad_message_is_deleted_and_logged(env):
     env.aws.sqs.send_message(QueueUrl=env.aws.queue_url, MessageBody="not json")
     assert env.run_one() == "bad_message"
