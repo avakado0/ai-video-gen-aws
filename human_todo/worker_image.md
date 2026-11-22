@@ -1,6 +1,6 @@
 # Worker image and first GPU steps (yours)
 
-The worker code, tests and Dockerfile are written (`_plans/02_gpu_worker.md`). Nothing has run on a GPU yet.
+The worker code, tests and Dockerfile are written (`_plans/FINISHED_02_gpu_worker.md`). It has run on AWS GPUs since 2026-11-21; every step below is done.
 
 - [x] Free about 25 GB of disk (the image build needs it; the image is about 8 GB).
 - [x] Create a Kaggle account (phone verification) for the GPU spike.

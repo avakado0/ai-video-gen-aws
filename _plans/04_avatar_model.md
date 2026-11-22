@@ -1,6 +1,6 @@
 # 04 Avatar model: switch the product from Wan 1.3B text-to-video to a talking-head avatar model
 
-Canonical plan (approved 2026-11-21). Supersedes the Wan 1.3B text-to-video product; Wan is parked, not deleted. Housekeeping plan from earlier today is done (pin, ECR check, chmod).
+Canonical plan (approved 2026-11-21). Status 2026-11-22: ON HOLD, not finished. Steps A and the spike brief are written; no avatar model was run. Plan 06 put Wan 2.2 5B (text and image to video, no audio) in the deployed product instead, so the avatar is a separate, later decision (one model per deployment; ADR 0005; the avatar ADR would be 0006). Supersedes the Wan 1.3B text-to-video product; Wan is parked, not deleted. Housekeeping plan from earlier today is done (pin, ECR check, chmod).
 
 ## Context
 The first AWS run (2026-11-21, `_effort_logs/2026-11-21_first_gpu_run_on_aws.md`) proved the pipeline: cold start 6 min 17 s, g5.2xlarge, fast clip 91.9 s, high clip 199.9 s, no errors. The picture quality of Wan 2.1 1.3B was rejected by the owner ("looks quite shitty"). The owner says Wan 1.3B was only a trial to see if the system works, and wants the product to be an avatar model from now on. Repo notes name no avatar model: they only say avatar is a future manifest shape (`CONTEXT.md` "Model shape", spec 3B, mock `frontend/js/mock/manifests/avatar.json`) and that the 14B Wan "would need g5.2xlarge or larger". This plan decides the product and how to choose the model.

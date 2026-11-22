@@ -1,6 +1,6 @@
 # Plan 06: switch the product model from Wan 2.1 T2V 1.3B to Wan 2.2 TI2V 5B
 
-Canonical plan (grilled with the owner 2026-11-22; owner approved implementing it the same day, phase A first). Status: phase A done 2026-11-22 (code, manifest, Terraform edit and docs, all offline; 354 tests). Phase B (owner steps) is next; nothing is deployed. Plan 05's "Phase D" road, taken with the 5B model instead of the 14B.
+Canonical plan (grilled with the owner 2026-11-22; owner approved implementing it the same day, phase A first). Status 2026-11-22: phases A and B done, trial 1 accepted and closed, RAM margin (G17) measured and closed (see the sections at the end). The 5B model is deployed and has run on AWS. Still open: a g6 test, only if g5 capacity ever runs short; this plan becomes FINISHED when that item is closed or dropped. Plan 05's "Phase D" road, taken with the 5B model instead of the 14B.
 
 ## Context
 Plan 05 got Wan 2.1 1.3B to "usable, not perfect" (owner's words, 2026-11-22). The owner asks whether Wan 2.2 5B can replace it. Checked 2026-11-22 against the Hugging Face API and the Wan2.2 repo:

@@ -1,6 +1,6 @@
 # Plan 07: shorten the idle wait before the GPU scales in to zero
 
-Canonical plan. Decided with the owner 2026-11-22: "shorten the idle time as much as possible". Status: done. Applied 2026-11-22 (9 added, 1 changed, 0 destroyed) and measured the same day.
+Canonical plan. Decided with the owner 2026-11-22: "shorten the idle time as much as possible". Status: FINISHED 2026-11-22. Applied 2026-11-22 (9 added, 1 changed, 0 destroyed) and measured the same day.
 
 ## Context
 

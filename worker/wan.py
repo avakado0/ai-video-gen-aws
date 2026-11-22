@@ -2,7 +2,7 @@
 
 Run on a Kaggle T4 on 2026-11-20 (docs/wan_spike_findings.md): loads, clean frames in fp16 with an
 fp32 VAE, abort frees the GPU. Ran on a g5.2xlarge on 2026-11-21. Settings tuned on Kaggle in plan 05
-(_plans/05_quality_variants.md): flow_shift 3.0 (from a 14B docstring) blew the colours out; Wan's
+(_plans/FINISHED_05_quality_variants.md): flow_shift 3.0 (from a 14B docstring) blew the colours out; Wan's
 README recipe (flow_shift 8, guidance 6, 50 steps, official negative prompt) was judged usable.
 
 torch and diffusers are imported inside methods, so the rest of the worker (and its tests)

@@ -1,6 +1,6 @@
 # 02: GPU worker (code, tests, Dockerfile)
 
-Status: built 2026-11-18 (code, tests, Dockerfile). Nothing run on a GPU. Image built and pushed 2026-11-20 (never run). `ecs.tf` change applied 2026-11-20 (1 added, 3 changed, 1 destroyed; `terraform/plans/2026-11-20_quality_option.txt`).
+Status: FINISHED 2026-11-22. Built 2026-11-18 (code, tests, Dockerfile), image pushed 2026-11-20, first ran on AWS 2026-11-21 (g5.2xlarge, cold start 6 min 17 s) and has run on AWS since. The model code moved on in plans 05, 06 and 07. Text below is the history as written at the time. `ecs.tf` change applied 2026-11-20 (1 added, 3 changed, 1 destroyed; `terraform/plans/2026-11-20_quality_option.txt`).
 
 ## Context
 The front half works (API deployed, jobs queue as pending). Nothing reads the queue. The worker takes the SQS message, checks the job is still wanted, runs the model, uploads the clip, and reports failure or cancel correctly. Spec: section 4 and 3D/3E; the cancel re-checks were decided 2026-11-18.

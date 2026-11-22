@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Generate spike/wan_t4_quality_grid.ipynb, the third Kaggle T4 notebook: which settings give a usable picture?
 
-Plan 05 (`_plans/05_quality_variants.md`). The first AWS run (2026-11-21) was fast and cheap but the
+Plan 05 (`_plans/FINISHED_05_quality_variants.md`). The first AWS run (2026-11-21) was fast and cheap but the
 picture was judged unusable. Our steps (20 or 30), flow_shift (3.0) and negative prompt differ from
 what Wan's own repo uses and recommends for the 1.3B model. This notebook runs nine variants, one cell
 each, on one seed and one prompt, and saves every clip as an mp4 so they can be watched side by side.

@@ -1,6 +1,6 @@
 # 03: `quality` option (fast / high)
 
-Status: built 2026-11-20 (steps 1 to 6; the artifact sync is pending). The `ecs.tf` query change is validate only, not applied. The mock front-end `text.json` was left alone: it is a different mock model. Owner decision: ship two quality levels, chosen on the front end.
+Status: FINISHED 2026-11-22. Built 2026-11-20 (steps 1 to 6) and in use since: the `ecs.tf` change was applied 2026-11-20 (see plan 02) and every AWS run used `fast` or `high`. The step counts and resolutions in the table are the 1.3B values of 2026-11-20; the current ones are in plan 06. The mock front-end `text.json` was left alone: it is a different mock model. Owner decision: ship two quality levels, chosen on the front end.
 
 ## Context
 The Kaggle spike (`docs/wan_spike_findings.md`) showed generation is slow and resolution is the big lever: 640x368 takes 11.0 s per step, 832x480 takes 23.7 s. Owner wants both: a quick default and a sharper option. The UI is manifest-driven, so this is one new enum param, no front-end code.
