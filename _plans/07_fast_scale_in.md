@@ -1,6 +1,6 @@
 # Plan 07: shorten the idle wait before the GPU scales in to zero
 
-Canonical plan. Decided with the owner 2026-11-22: "shorten the idle time as much as possible". Status: designed, building test-first. Nothing applied to AWS yet.
+Canonical plan. Decided with the owner 2026-11-22: "shorten the idle time as much as possible". Status: code and Terraform written and validated offline (commits 4419a82 to c73713b). Waiting for the owner's `terraform plan` and `apply`. Nothing applied to AWS yet.
 
 ## Context
 
@@ -32,9 +32,9 @@ Idle wait about `idle_minutes` (3) plus the Lambda and termination, so 5 to 8 mi
 ## Steps
 
 1. [x] Plan written.
-2. [ ] Tests first for the Lambda (`tests/scale_in/`, moto): idle scales the ASG to 0 and clears protection; a visible message, an in-flight message, a service desired count above 0, or running tasks each leave everything alone; `MinSize` and `MaxSize` untouched; ASG already at 0 is a no-op; AWS errors are raised so the invocation is retried; the log line carries no ids.
-3. [ ] Lambda `lambdas/scale_in/handler.py` until green.
-4. [ ] Terraform in `scaling.tf`: `idle_minutes` variable, `disable_scale_in` on `track_jobs`, the idle alarm and its step policy, the Lambda with its role, log group and EventBridge rule and permission. `terraform fmt` and `validate` offline only.
+2. [x] Tests first for the Lambda (`tests/scale_in/`, moto): idle scales the ASG to 0 and clears protection; a visible message, an in-flight message, a service desired count above 0, or running tasks each leave everything alone; `MinSize` and `MaxSize` untouched; ASG already at 0 is a no-op; AWS errors are raised so the invocation is retried; the log line carries no ids.
+3. [x] Lambda `lambdas/scale_in/handler.py` until green. Added during review: desired 0 with tasks still counted raises `TasksStillStopping`, so Lambda retries (the stopped event can beat the service counts by seconds). 13 tests, 307 in the suite.
+4. [x] Terraform in `scaling.tf` and `variables.tf`: `idle_minutes` variable, `disable_scale_in` on `track_jobs`, the idle alarm and its step policy, the Lambda with its role, log group and EventBridge rule and permission. `terraform fmt` and `validate` offline only.
 5. [ ] Owner: `terraform plan`, review, `apply`. Claude never runs these.
 6. [ ] Owner: one measuring run (raise limits to 1, one `fast` job, `scripts/watch_scale_in.sh`, restore limits to 0). Expected cost about $0.12 on a g4dn (my estimate). If idle is still long, read the Lambda's log and the alarm history.
 7. [ ] Update the spec (idle bullet and scaling section), CLAUDE.md scaling chain, plan 01, effort log and the artifact with the measured number.
