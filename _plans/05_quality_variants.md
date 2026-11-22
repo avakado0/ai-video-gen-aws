@@ -1,5 +1,7 @@
 # Plan 05: find a usable picture quality for Wan 2.1 1.3B
 
+Update 2026-11-22 (later): the owner asked for the next step up and chose Wan 2.2 TI2V 5B instead of the 14B of phase D; see `_plans/06_wan22_ti2v_5b.md` and ADR 0005.
+
 Status 2026-11-22: Phases 0, A, B done. Owner accepted run 9 (50 steps, guidance 6, flow_shift 8, official negative prompt; the Kaggle mp4 was lost when the session reset, the contact sheet survives in the executed notebook). Phase C step 1 done (`e6c6c26`): `worker/wan.py` now has flow_shift 8.0, guidance 6.0, `fast` 832x480 at 30 steps, `high` 832x480 at 50 steps, and Wan's official negative prompt as the default (a user negative prompt replaces it). `fast` was raised from 640x368 (below the 480p training size) rather than dropped. Phase C done 2026-11-22: image rebuilt and pushed, one `high` job (seed 777, the run 9 prompt, default negative prompt) ran on a g4dn.2xlarge: 1049.7 s, 19.4 s per step, natural colour, cat in frame, same quality as Kaggle run 9 (a small stray object on the board nose in every frame). The new log lines work. Runs 5, 6, 7, 8 were skipped. Open: whether "usable, not perfect" is enough long term (Phase D, the 14B model, only if the owner wants more).
 
 ## Context
