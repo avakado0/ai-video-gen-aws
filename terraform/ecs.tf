@@ -32,7 +32,7 @@ resource "aws_ecs_task_definition" "worker" {
       essential = true
 
       # One job at a time, so the task takes the whole instance: a g5.2xlarge (and the
-      # g6.2xlarge to come) has 8 vCPU and 32 GB RAM. The 5B model in bf16 keeps about 22 GB
+      # g6.2xlarge to come) has 8 vCPU and 32 GB RAM. The 5B model in bf16 keeps about 24 GB
       # of weights in RAM with CPU offload (my estimate, unmeasured: trial 1 shows whether
       # this 29 GiB limit is enough). Leave a little for the OS and the ECS agent.
       cpu    = 7168
