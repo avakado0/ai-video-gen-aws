@@ -1,4 +1,5 @@
 /** Renders the job form from a capability manifest. Knows nothing about specific models. */
+import { minSideHint, shortSideProblem } from './imagesize.js';
 
 const el = (tag, attrs = {}, ...kids) => {
   const node = Object.assign(document.createElement(tag), attrs);
@@ -17,6 +18,18 @@ function mediaSeconds(file, kind) {
     m.onerror = () => resolve(null);
     m.src = URL.createObjectURL(file);
   });
+}
+
+/** Pixel size of an image file, or null if the browser cannot read it. */
+async function imageSize(file) {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const size = { width: bitmap.width, height: bitmap.height };
+    bitmap.close();
+    return size;
+  } catch {
+    return null;
+  }
 }
 
 export class ManifestForm {
@@ -58,7 +71,8 @@ export class ManifestForm {
       this.fields[slot.name] = input;
       const hint = [slot.required ? 'Required' : 'Optional', slot.kind,
         many && `up to ${slot.max_files} files`, `max ${mb(slot.max_bytes)} each`,
-        slot.max_seconds && `max ${slot.max_seconds}s`].filter(Boolean).join(', ');
+        slot.max_seconds && `max ${slot.max_seconds}s`,
+        slot.kind === 'image' && minSideHint(slot.min_side)].filter(Boolean).join(', ');
       const preview = el('div', { className: 'previews' });
       preview.urls = [];
       this.previewBoxes.push(preview);
@@ -157,7 +171,11 @@ export class ManifestForm {
         let problem = null;
         if (!slot.mime.includes(file.type)) problem = `${file.name}: unsupported type ${file.type || 'unknown'}.`;
         else if (file.size > slot.max_bytes) problem = `${file.name}: larger than ${mb(slot.max_bytes)}.`;
-        else if (slot.max_seconds && slot.kind !== 'image') {
+        else if (slot.kind === 'image' && slot.min_side) {
+          const size = await imageSize(file);
+          problem = size === null ? `${file.name}: could not read this image file.`
+            : shortSideProblem(file.name, size.width, size.height, slot.min_side);
+        } else if (slot.max_seconds && slot.kind !== 'image') {
           const secs = await mediaSeconds(file, slot.kind);
           if (secs === null) problem = `${file.name}: could not read this ${slot.kind} file.`;
           else if (secs > slot.max_seconds) problem = `${file.name}: longer than ${slot.max_seconds}s.`;
