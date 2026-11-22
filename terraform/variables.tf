@@ -32,6 +32,17 @@ variable "gpu_max" {
   }
 }
 
+variable "idle_minutes" {
+  description = "Minutes of an empty queue (nothing waiting, nothing running) before the worker service scales in to 0, which then takes the GPU instance down (plan 07). Measured 2026-11-22 with the old policies: about 40 minutes. A job that arrives later than this after the last one waits the full cold start (about 12 minutes) again."
+  type        = number
+  default     = 3
+
+  validation {
+    condition     = var.idle_minutes >= 1 && var.idle_minutes <= 15 && floor(var.idle_minutes) == var.idle_minutes
+    error_message = "idle_minutes must be a whole number from 1 to 15."
+  }
+}
+
 # Fixed names shared across files. Policies in iam.tf and budget.tf are scoped
 # by these names rather than by resource references, because the ASG and the
 # cluster depend on those roles and a reference would create a cycle.
@@ -42,5 +53,6 @@ locals {
   api_log_group         = "/aws/lambda/aivideogen-api"
   failure_log_group     = "/aws/lambda/aivideogen-failure-marker"
   budget_log_group      = "/aws/lambda/aivideogen-budget-cutoff"
+  scale_in_log_group    = "/aws/lambda/aivideogen-scale-in"
   worker_log_group_name = "/aivideogen/worker"
 }
