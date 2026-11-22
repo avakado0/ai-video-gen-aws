@@ -25,6 +25,17 @@ The cluster name is `aivideogen` (`terraform/variables.tf`). If in doubt: `aws e
 
 Task scale-in protection and ECS managed termination protection delay the shutdown. Observed 2026-11-21 (idle instance, no job running): the instance stayed `running` for a few minutes after the three commands, then went `Terminating:Proceed` with protection cleared, with no manual step. Wait; check with `aws autoscaling describe-auto-scaling-instances --region us-west-2 --query 'AutoScalingInstances[].[LifecycleState,ProtectedFromScaleIn]' --output text`. Only if it is still `True` after about 10 minutes, remove it by hand: `aws autoscaling set-instance-protection --auto-scaling-group-name aivideogen-gpu --instance-ids <id> --no-protected-from-scale-in --region us-west-2`.
 
+## If a job is running, the three commands do not stop it
+
+Seen on 2026-11-22 (plan 06, trial 1): the worker turns on task scale-in protection while a job runs (up to 120 minutes), and ECS ignores a lowered desired count for a protected task. The three commands above stopped nothing mid-job: the job ran on, failed on its own six minutes later, and the worker took the same message again (attempt 3) before ECS stopped it. They only stop new work. To end a running job at once, stop the task directly (a direct stop is not scale-in; this has not been tried on a running job yet, so check the result):
+
+```
+aws ecs list-tasks --cluster aivideogen --service-name aivideogen-worker --region us-west-2 --query 'taskArns[]' --output text
+aws ecs stop-task --cluster aivideogen --task <task-arn-from-above> --reason "manual stop" --region us-west-2
+```
+
+The worker gets SIGTERM, releases its message and exits. Run the three commands first, so nothing starts a new task, then the two above.
+
 ## Check that it is gone
 
 ```

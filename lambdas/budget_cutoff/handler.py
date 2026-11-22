@@ -5,9 +5,10 @@ three brakes, in this order:
 
 1. The worker service's autoscaling target goes to min 0 / max 0, so the
    wake-up and target-tracking policies cannot raise the task count again.
-2. The ECS service's desired count goes to 0. The running task gets SIGTERM,
-   releases its message (ChangeMessageVisibility 0), and ECS lifts managed
-   termination protection from the instance.
+2. The ECS service's desired count goes to 0. A task that is idle stops and ECS lifts managed
+   termination protection from the instance. A task that is running a job is protected (task
+   scale-in protection, up to 120 minutes) and keeps running until the job ends: seen in plan 06
+   trial 1, 2026-11-22. It then gets SIGTERM, so the next job is not taken.
 3. The GPU ASG's MinSize, MaxSize and DesiredCapacity go to 0, so the
    unprotected instance is terminated and no new one starts.
 
