@@ -111,3 +111,22 @@ Fix, test first (373 tests): `text_encoder=None` when loading, so the 11.4 GB is
 Also confirmed in the same run: plan 07 works again. Last activity 13:36:57 (the `stale` drop), worker stopped 13:41:57 (5.0 min), ASG desired 0 within a minute, instance gone from the ASG at 13:48.
 
 Trial 1 so far: about 1 h 20 min of g5 across two runs, about $0.85 (my estimate). No clip has been produced yet.
+
+## Trial 1, first clip (2026-11-22, g5.2xlarge Spot, third run)
+
+**A clip came out:** text, `fast`, 3 s, 1280x704, 73 frames. The owner saw it on the site (status Ready, download link); the quality verdict is the owner's.
+
+How the third run went. The owner had submitted a job while the final image was still being built and pushed, so the task started (14:42 UTC) on the previous image, digest `265f5a7a`. **I told the owner that image already had the bf16 VAE. That was wrong:** the bf16 change was committed after that push and is first in the latest push, `12651cc0`. The identical OOM numbers (2.60 GiB requested, 18.29 GiB allocated, as in the fp32 run) showed it. Lesson: before saying what a running image contains, compare its digest and push time with the commits, or ask `describe-tasks` for the digest first.
+
+Attempt 1 on the old image failed at the decode (413.5 GPU s); attempt 2 was at step 15 when the owner stopped the task with `aws ecs stop-task`. **That worked on a protected running task:** the call was accepted (`desiredStatus STOPPED`), the worker got SIGTERM, logged `outcome: released` after 279.7 s and the message went back; the service started a replacement task on the same instance (weights already on the NVMe, no new cold start), which pulled `:latest` = `12651cc0` and took the same job as attempt 3.
+
+**Measured on `12651cc0` (attempt 3):**
+- `model loaded, peak RAM so far` **24.2 GiB** (was 27.5 and 28.5; limit 29).
+- `peak memory: GPU 12.6 GiB, RAM 24.4 GiB` after the job: the bf16 decode has about 9 GiB of GPU headroom on the A10G's 22.06 GiB (my estimate was 11 to 13 GiB), and RAM has 4.6 GiB of margin.
+- 420.5 GPU seconds for `fast` 3 s: 30 steps at about 11.6 s (5 min 56 s), decode and export about a minute. Upload 3 s after the peak line.
+- Cost of that clip's compute: about $0.08 to $0.10 (g5 Spot $0.69 to $0.90 an hour; my arithmetic).
+- Plan 07 held for the third time: after the job the idle alarm, the service and the instance went down without a hand stop (service 0/0 and `shutting-down` at 15:12 UTC).
+
+**Trial 1 cost so far:** about 1 h 45 min of g5 over three runs, about $1.3 to $1.5 (my estimate), one clip.
+
+**Still to do in trial 1:** (c) image to video on a real GPU with a real upload from the site (first real use of `POST /uploads` on real S3); (b) a 5 s clip (the longest case: 121 frames, about 27k tokens, my estimate about 2x the time per step and a higher GPU peak, unmeasured); a second job in the same process (the case that got the container OOM-killed before the encoder change).

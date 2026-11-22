@@ -27,7 +27,7 @@ Task scale-in protection and ECS managed termination protection delay the shutdo
 
 ## If a job is running, the three commands do not stop it
 
-Seen on 2026-11-22 (plan 06, trial 1): the worker turns on task scale-in protection while a job runs (up to 120 minutes), and ECS ignores a lowered desired count for a protected task. The three commands above stopped nothing mid-job: the job ran on, failed on its own six minutes later, and the worker took the same message again (attempt 3) before ECS stopped it. They only stop new work. To end a running job at once, stop the task directly (a direct stop is not scale-in; this has not been tried on a running job yet, so check the result):
+Seen on 2026-11-22 (plan 06, trial 1): the worker turns on task scale-in protection while a job runs (up to 120 minutes), and ECS ignores a lowered desired count for a protected task. The three commands above stopped nothing mid-job: the job ran on, failed on its own six minutes later, and the worker took the same message again (attempt 3) before ECS stopped it. They only stop new work. To end a running job at once, stop the task directly (a direct stop is not scale-in; tried on a running job on 2026-11-22: the call was accepted, the worker got SIGTERM, released its message (`outcome: released`) and exited, and the service started a replacement task at once, so run the three commands above first or the replacement will pick the job up again):
 
 ```
 aws ecs list-tasks --cluster aivideogen --service-name aivideogen-worker --region us-west-2 --query 'taskArns[]' --output text
