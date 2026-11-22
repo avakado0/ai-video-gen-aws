@@ -3,8 +3,11 @@
 # instance until the Paid plan and the Spot quota are in place.
 
 # Latest ECS-optimized GPU AMI (NVIDIA drivers and Docker runtime included).
-# A newer recommended image changes the launch template; running instances keep
-# theirs.
+# A newer recommended image would change the launch template; running instances keep
+# theirs. The launch template ignores image_id changes (below): the image of the two measured
+# runs (2026-11-21 and 2026-11-22) stays until a deliberate refresh, so an untested image never
+# rides along with an unrelated apply (found 2026-11-22 during plan 07). To refresh: remove the
+# ignore, plan, apply, boot one test job, then put it back.
 data "aws_ssm_parameter" "ecs_gpu_ami" {
   name = "/aws/service/ecs/optimized-ami/amazon-linux-2023/gpu/recommended/image_id"
 }
@@ -62,6 +65,10 @@ resource "aws_launch_template" "gpu" {
     region        = var.region
     cluster_name  = local.ecs_cluster_name
   }))
+
+  lifecycle {
+    ignore_changes = [image_id]
+  }
 }
 
 resource "aws_autoscaling_group" "gpu" {
