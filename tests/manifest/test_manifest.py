@@ -130,6 +130,23 @@ def test_max_seconds_only_for_audio_and_video():
     assert manifest.validate(with_(inputs=[ok])) == []
 
 
+def test_min_side_is_a_positive_int_and_only_for_images():
+    assert manifest.validate(with_(inputs=[slot(min_side=512)])) == []
+    for value in (0, -1, 1.5, "512", True):
+        bad(with_(inputs=[slot(min_side=value)]), "min_side")
+    audio = slot(kind="audio", mime=["audio/wav"], min_side=512)
+    bad(with_(inputs=[audio]), "min_side")
+
+
+def test_the_live_manifest_asks_for_the_same_image_size_as_the_worker():
+    """The browser refuses a small start image from the manifest; the worker refuses it with its own
+    constant. Two places, one number."""
+    from worker import wan22
+
+    image = load_v1()["inputs"][0]
+    assert image["min_side"] == wan22.MIN_IMAGE_SIDE
+
+
 def test_param_type_must_be_known():
     bad(with_(params=[{"name": "x", "type": "complex"}]), "type")
 

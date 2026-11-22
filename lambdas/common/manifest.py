@@ -57,6 +57,11 @@ def _slot_errors(i, s, seen):
             errors.append(f"{where}: max_seconds applies only to audio and video slots")
         elif not _is_number(s["max_seconds"]) or s["max_seconds"] <= 0:
             errors.append(f"{where}: max_seconds must be a positive number")
+    if "min_side" in s:
+        if s.get("kind") != "image":
+            errors.append(f"{where}: min_side applies only to image slots")
+        elif not _is_int(s["min_side"]) or s["min_side"] < 1:
+            errors.append(f"{where}: min_side must be a positive integer (pixels)")
     return errors
 
 
