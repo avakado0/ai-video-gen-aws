@@ -45,7 +45,7 @@ Plan 05 got Wan 2.1 1.3B to "usable, not perfect" (owner's words, 2026-11-22). T
 
 ## Risks
 - **Image-to-video path is the biggest unknown.** The checkpoint's `model_index.json` names `WanPipeline`; image input goes through `WanImageToVideoPipeline`. Wiring it from shared components is read from the 0.35.2 source, not run. Fakes cannot prove it; trial 1(c) does.
-- **VRAM peak at 1280x704x121** (VAE decode) is unmeasured; 24 GB may not hold without tiling.
+- **VRAM peak at 1280x704x121** (VAE decode) is unmeasured; 24 GB may not hold. Tiling is not an option in diffusers 0.35.2 (see trial 1 findings); Wan's README says 24 GB is enough for 720p without it.
 - **Speed and cost per clip unmeasured** on an A10G. 5 s clips at 50 steps may take 10 to 20 min (my estimate; README gives under 9 min on a 4090). A Spot interruption restarts a job from zero, so longer jobs waste more credit.
 - **g5-only fleet** has no Spot diversity until g6 is added; if g5 capacity is short, jobs wait.
 - **Quality is not guaranteed.** Newer and bigger than 1.3B, but only the owner's eyes decide. Plan 05's rule stands: iterate settings on a clip, not a spec.
@@ -60,7 +60,7 @@ Findings and deviations from what the plan said, from reading the diffusers 0.35
 - `pipe.components` of `WanPipeline` leaves the transformer out, so the image pipeline is built from named parts (`tokenizer`, `text_encoder`, `vae`, `scheduler`, `transformer`, `transformer_2`) with `expand_timesteps=True`.
 - The image pipeline's own `video_processor.preprocess` stretches the image to the target size, which is why our crop happens first. The 5B transformer has `image_dim` None, so no CLIP image encoder is needed.
 - Two pipelines on shared modules cannot both keep CPU-offload hooks (the second `enable_model_cpu_offload` replaces the first's). The generator moves the hooks only when the kind of job changes. Tested with fakes; real behaviour is trial 1(c).
-- **Deviation, owner to confirm:** VAE tiling is on by default in `load()`, as cheap cover against the unmeasured decode OOM at 1280x704x121 (a failed trial costs a whole generation). It can be turned off if the trial shows it is not needed or costs quality.
+- **VAE tiling stays off.** My phase A deviation (tiling on by default as insurance) was wrong: see the trial 1 findings below. It cost a failed first attempt.
 - Weights in RAM with CPU offload: about 24 GB (my arithmetic from the repo's file sizes: transformer stored fp32, about 20 GB, so about 10 GB in bf16; text encoder 11.4 GB; VAE 2.8 GB). The task's memory limit is 29 GiB, so this is tight. Unmeasured; trial 1 shows it. If it does not fit, the fix is a Terraform change to the task's memory or a lighter text-encoder load, not a guess now.
 - The weights runbook's temporary EBS volume went from 40 GB to 60 GB (the 5B is 34.2 GB), and its variables now point at the 5B repo and commit.
 
@@ -72,3 +72,13 @@ Findings and deviations from what the plan said, from reading the diffusers 0.35
 
 ## Not doing now
 No push, no `terraform apply`, no image build, no AWS call, no edits to the models bucket by Claude. No 480p tier, no g6 until trial 1 is accepted, no avatar work.
+
+## Trial 1 findings (2026-11-22, g5.2xlarge Spot, first job: text `fast` 3 s)
+
+Cold start with both models in S3 (63 GB copy): ASG launch about 12:13:50 UTC to `worker ready` 12:23:00, about 9 min; model load 24 s. `model loaded, peak RAM so far 27.5 GiB` against the container's 29 GiB hard limit: it survived, margin about 1.5 GiB (a loading transient; the generation's own peak was never reached). Denoising: 12.4 s per step at first, then 11.6 s (30 steps in about 6 min), faster than my estimate.
+
+**Attempt 1 failed after the denoising, in the VAE decode:** `RuntimeError: The size of tensor a (2) must match the size of tensor b (4) at non-singleton dimension 2`, `gpu_seconds` 405, outcome `error`. Root cause, read in the diffusers 0.35.2 source: `AutoencoderKLWan.tiled_decode` calls `self.decoder(...)` for every frame without `first_chunk=True`, while the plain `_decode` passes it for the first frame; the Wan 2.2 VAE's `DupUp3D` shortcut needs it. The tiling was turned on by my phase A deviation, so the failure was mine. Fix: tiling off (test `test_load_keeps_vae_tiling_off_...`), image rebuild.
+
+SQS handed the message straight back, so attempt 2 started at once and was heading for the same failure. The owner ran the stop commands (service autoscaling max 0, service desired 0, ASG 0): that also releases the message, so the same job stays in the queue for the retry (received twice so far; the DLQ is at 8). About 22 minutes of g5 were billed, about $0.30 (my estimate).
+
+**Open design point, for the owner:** a deterministic error costs every one of the 8 attempts. With a 6 to 20 minute job that is up to about an hour of GPU (about $0.8) for one doomed job. Options: lower `maxReceiveCount` for generator errors, or have the worker write the `.failed` marker and delete the message after an error that repeats. Not done; needs a decision.

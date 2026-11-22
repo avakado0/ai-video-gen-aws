@@ -420,10 +420,13 @@ def test_load_sets_up_offload_once_on_the_text_pipeline_only(monkeypatch, tmp_pa
     assert gen._offloaded is gen.pipe
 
 
-def test_load_turns_on_vae_tiling_as_cover_against_running_out_of_memory(monkeypatch, tmp_path):
-    # The VAE decode at 1280x704x121 is the unmeasured out-of-memory risk (plan 06); offload does not cover it.
+def test_load_keeps_vae_tiling_off_because_diffusers_0_35_2_breaks_the_2_2_vae_with_it(monkeypatch, tmp_path):
+    # Found on AWS 2026-11-22 (trial 1): with tiling on, the decode failed after all the denoising steps
+    # with "size of tensor a (2) must match the size of tensor b (4)". In diffusers 0.35.2
+    # `AutoencoderKLWan.tiled_decode` never passes `first_chunk=True` to the decoder, which the Wan 2.2
+    # VAE's DupUp3D shortcut needs for the first frame. The plain decode works frame by frame.
     _, seen = _load(monkeypatch, tmp_path)
-    assert seen["tiling"] == 1
+    assert seen["tiling"] == 0
 
 
 def test_flow_shift_defaults_to_5_and_can_be_overridden(monkeypatch, tmp_path):

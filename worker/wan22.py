@@ -107,14 +107,14 @@ class Wan22Generator(Generator):
 
     def load(self):
         """Load the weights once, at start. Transformer and text encoder in bf16 (the A10G and the L4
-        have it), VAE in fp32. Components move to the GPU only while they run. VAE tiling is on as
-        cover against running out of memory in the decode at 1280x704x121, which offload does not
-        help with (plan 06; unmeasured, turn it off if the trial shows it is not needed)."""
+        have it), VAE in fp32. Components move to the GPU only while they run. VAE tiling stays OFF:
+        diffusers 0.35.2's `tiled_decode` never passes `first_chunk=True` to the decoder, which the
+        Wan 2.2 VAE needs for its first frame, so tiled decoding fails with a tensor size mismatch
+        (found on AWS 2026-11-22, trial 1). The plain decode runs frame by frame."""
         import torch
         from diffusers import AutoencoderKLWan, UniPCMultistepScheduler, WanImageToVideoPipeline, WanPipeline
 
         vae = AutoencoderKLWan.from_pretrained(self.path, subfolder="vae", torch_dtype=torch.float32)
-        vae.enable_tiling()
         pipe = WanPipeline.from_pretrained(self.path, vae=vae, torch_dtype=torch.bfloat16)
         flow_shift = FLOW_SHIFT if self.flow_shift is None else self.flow_shift
         pipe.scheduler = UniPCMultistepScheduler.from_config(pipe.scheduler.config, flow_shift=flow_shift)
