@@ -39,6 +39,13 @@ IMAGE_SLOT = "image"                       # the manifest's optional start-image
 MIN_IMAGE_SIDE = 512                       # the shorter side of the start image, in pixels
 
 
+def _peak_ram_gib():
+    """Peak resident memory of this process so far, in GiB (Linux reports KiB)."""
+    import resource
+
+    return resource.getrusage(resource.RUSAGE_SELF).ru_maxrss / 2**20
+
+
 def num_frames(duration_seconds):
     return FRAMES[duration_seconds]
 
@@ -118,6 +125,8 @@ class Wan22Generator(Generator):
             boundary_ratio=pipe.config.boundary_ratio, expand_timesteps=True)
         pipe.enable_model_cpu_offload()
         self.pipe, self.image_pipe, self._offloaded = pipe, image_pipe, pipe
+        # The instance has no SSH, so the log is the only way to see whether the weights fit in RAM.
+        log.info("model loaded, peak RAM so far %.1f GiB", _peak_ram_gib())
 
     def generate(self, job, inputs, should_abort, out_dir):
         error = None
@@ -188,7 +197,10 @@ class Wan22Generator(Generator):
         )
         if start_image is not None:
             kwargs["image"] = start_image
+        torch.cuda.reset_peak_memory_stats()     # so the peak below belongs to this job
         frames = pipe(**kwargs).frames[0]
+        log.info("peak memory: GPU %.1f GiB, RAM %.1f GiB",
+                 torch.cuda.max_memory_allocated() / 2**30, _peak_ram_gib())
         out = pathlib.Path(out_dir) / "clip.mp4"
         export_to_video(frames, str(out), fps=FPS)
         return out

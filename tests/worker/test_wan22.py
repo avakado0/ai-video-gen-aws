@@ -72,7 +72,11 @@ def test_importing_the_module_needs_no_torch_and_no_pillow():
 def _install_fake_torch(monkeypatch, calls):
     torch = types.ModuleType("torch")
     torch.Generator = lambda device: types.SimpleNamespace(manual_seed=lambda s: None)
-    torch.cuda = types.SimpleNamespace(empty_cache=lambda: calls.append("empty_cache"))
+    torch.cuda = types.SimpleNamespace(
+        empty_cache=lambda: calls.append("empty_cache"),
+        reset_peak_memory_stats=lambda: calls.append("reset_peak"),
+        max_memory_allocated=lambda: 5 * 2**30,      # a fake GPU that peaked at 5 GiB
+    )
     torch.float32, torch.bfloat16 = "float32", "bfloat16"
     utils = types.ModuleType("diffusers.utils")
     utils.export_to_video = lambda *a, **k: None
@@ -425,3 +429,28 @@ def test_load_turns_on_vae_tiling_as_cover_against_running_out_of_memory(monkeyp
 def test_flow_shift_defaults_to_5_and_can_be_overridden(monkeypatch, tmp_path):
     assert _load(monkeypatch, tmp_path)[1]["flow_shift"] == 5.0
     assert _load(monkeypatch, tmp_path, flow_shift=3.0)[1]["flow_shift"] == 3.0
+
+
+# --- memory lines for the trial (plan 06): peak GPU and RAM, since the instance has no SSH -----------
+
+def test_it_logs_peak_gpu_and_ram_memory_after_generating(monkeypatch, tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="worker.wan22")
+    gen, _ = _gen(monkeypatch, tmp_path)
+    gen.generate(_job(prompt="a very private cat"), {}, lambda: False, tmp_path)
+    lines = [r.getMessage() for r in caplog.records if "peak memory" in r.getMessage()]
+    assert len(lines) == 1
+    assert "GPU 5.0 GiB" in lines[0] and "RAM" in lines[0] and "GiB" in lines[0].split("RAM")[1]
+    assert "private" not in lines[0]
+
+
+def test_the_gpu_peak_is_reset_before_each_job_so_it_belongs_to_that_job(monkeypatch, tmp_path):
+    gen, log = _gen(monkeypatch, tmp_path)
+    gen.generate(_job(), {}, lambda: False, tmp_path)
+    assert log.index("reset_peak") < log.index("run_text")
+
+
+def test_load_logs_how_much_ram_the_loaded_model_takes(monkeypatch, tmp_path, caplog):
+    caplog.set_level(logging.INFO, logger="worker.wan22")
+    _load(monkeypatch, tmp_path)
+    assert any("model loaded" in r.getMessage() and "RAM" in r.getMessage() and "GiB" in r.getMessage()
+               for r in caplog.records)
