@@ -1,0 +1,158 @@
+# terraform plan, 2026-11-22, for plan 06 (Wan 2.2 5B manifest, g5-only fleet). Reviewed before apply.
+# Refresh lines (resource ids) are left out; everything from the execution plan on is unchanged.
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  ~ update in-place
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # aws_autoscaling_group.gpu will be updated in-place
+  ~ resource "aws_autoscaling_group" "gpu" {
+        id                               = "aivideogen-gpu"
+        name                             = "aivideogen-gpu"
+        # (31 unchanged attributes hidden)
+
+      ~ mixed_instances_policy {
+          ~ launch_template {
+              ~ override {
+                  ~ instance_type     = "g4dn.2xlarge" -> "g5.2xlarge"
+                    # (1 unchanged attribute hidden)
+                }
+              - override {
+                  - instance_type     = "g5.2xlarge" -> null
+                    # (1 unchanged attribute hidden)
+                }
+
+                # (1 unchanged block hidden)
+            }
+
+            # (1 unchanged block hidden)
+        }
+
+        # (3 unchanged blocks hidden)
+    }
+
+  # aws_ecs_service.worker will be updated in-place
+  ~ resource "aws_ecs_service" "worker" {
+        id                                 = "arn:aws:ecs:us-west-2:477656043770:service/aivideogen/aivideogen-worker"
+        name                               = "aivideogen-worker"
+        tags                               = {}
+      ~ task_definition                    = "arn:aws:ecs:us-west-2:477656043770:task-definition/aivideogen-worker:2" -> (known after apply)
+        # (15 unchanged attributes hidden)
+
+        # (3 unchanged blocks hidden)
+    }
+
+  # aws_ecs_task_definition.worker must be replaced
+-/+ resource "aws_ecs_task_definition" "worker" {
+      ~ arn                      = "arn:aws:ecs:us-west-2:477656043770:task-definition/aivideogen-worker:2" -> (known after apply)
+      ~ arn_without_revision     = "arn:aws:ecs:us-west-2:477656043770:task-definition/aivideogen-worker" -> (known after apply)
+      ~ container_definitions    = jsonencode(
+          ~ [
+              ~ {
+                  ~ environment          = [
+                        # (2 unchanged elements hidden)
+                        {
+                            name  = "MODELS_DIR"
+                            value = "/data/models"
+                        },
+                      ~ {
+                            name  = "MODEL_MANIFEST"
+                          ~ value = jsonencode(
+                              ~ {
+                                  ~ inputs = [
+                                      + {
+                                          + kind      = "image"
+                                          + label     = "Starting image (optional)"
+                                          + max_bytes = 10485760
+                                          + max_files = 1
+                                          + mime      = [
+                                              + "image/png",
+                                              + "image/jpeg",
+                                            ]
+                                          + name      = "image"
+                                          + required  = false
+                                        },
+                                    ]
+                                  ~ model  = "wan2-1-t2v-1-3b" -> "wan2-2-ti2v-5b"
+                                    # (3 unchanged attributes hidden)
+                                }
+                            )
+                        },
+                        {
+                            name  = "QUEUE_URL"
+                            value = "https://sqs.us-west-2.amazonaws.com/477656043770/aivideogen-jobs"
+                        },
+                    ]
+                    name                 = "worker"
+                  - portMappings         = []
+                  - systemControls       = []
+                  - volumesFrom          = []
+                    # (9 unchanged attributes hidden)
+                },
+            ] # forces replacement
+        )
+      ~ enable_fault_injection   = false -> (known after apply)
+      ~ id                       = "aivideogen-worker" -> (known after apply)
+      ~ revision                 = 2 -> (known after apply)
+      - tags                     = {} -> null
+        # (12 unchanged attributes hidden)
+
+      - volume {
+          - configure_at_launch = false -> null
+          - host_path           = "/data" -> null
+          - name                = "data" -> null
+        }
+      + volume {
+          + configure_at_launch = (known after apply)
+          + host_path           = "/data"
+          + name                = "data"
+        }
+    }
+
+  # aws_lambda_function.api will be updated in-place
+  ~ resource "aws_lambda_function" "api" {
+        id                             = "aivideogen-api"
+        tags                           = {}
+        # (29 unchanged attributes hidden)
+
+      ~ environment {
+          ~ variables = {
+              ~ "MODEL_MANIFEST"       = jsonencode(
+                  ~ {
+                      ~ inputs = [
+                          + {
+                              + kind      = "image"
+                              + label     = "Starting image (optional)"
+                              + max_bytes = 10485760
+                              + max_files = 1
+                              + mime      = [
+                                  + "image/png",
+                                  + "image/jpeg",
+                                ]
+                              + name      = "image"
+                              + required  = false
+                            },
+                        ]
+                      ~ model  = "wan2-1-t2v-1-3b" -> "wan2-2-ti2v-5b"
+                        # (3 unchanged attributes hidden)
+                    }
+                )
+                # (4 unchanged elements hidden)
+            }
+        }
+
+        # (3 unchanged blocks hidden)
+    }
+
+Plan: 1 to add, 3 to change, 1 to destroy.
+
+─────────────────────────────────────────────────────────────────────────────
+
+Saved the plan to: tfplan
+
+To perform exactly these actions, run the following command to apply:
+    terraform apply "tfplan"
+Releasing state lock. This may take a few moments...
