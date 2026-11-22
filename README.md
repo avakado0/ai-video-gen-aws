@@ -4,10 +4,10 @@
 
 A cost-optimized, serverless-front / GPU-back architecture for generating AI video clips on demand. The design goal is **near-zero cost when idle**: GPU capacity only exists while jobs are in the queue.
 
-Built end to end by one person on a $100 AWS credit: Terraform (17 files), a FastAPI Lambda, a GPU worker container, a no-build web front end, and 354 offline tests. Developed test-first.
+Built end to end by one person on a $100 AWS credit: Terraform (17 files), a FastAPI Lambda, a GPU worker container, a no-build web front end, and 383 offline tests plus 10 front-end tests. Developed test-first.
 
-> **Status (2026-11-20): everything except the first GPU run is built and deployed.**
-> The stack is applied with the GPU limit at zero, so it costs almost nothing. The model code has run on a Kaggle T4, the worker image is built and pushed to ECR, and the model weights are in S3. What has not happened yet is the first job on a real AWS GPU instance. See [What is verified](#what-is-verified).
+> **Status (2026-11-22): built, deployed, and run on a real AWS GPU.**
+> The stack is applied with the GPU limit at zero between tests, so it costs almost nothing while idle. The worker has run on Spot `g5.2xlarge` instances on 2026-11-21 and 2026-11-22. The current model, Wan 2.2 5B (text and image to video), produced clips the owner accepted. Not yet proven: a real Spot interruption, and the budget cut-off against a live job. See [What is verified](#what-is-verified).
 
 ![Architecture diagram](System_Diagrams/FINAL-AI%20Video%20Gen%20System.drawio.png)
 
@@ -24,7 +24,7 @@ A small, invite-only group of users logs in to a web app, submits a text prompt,
 | API | API Gateway (HTTP API) + one Lambda running FastAPI via Mangum | JWT authorizer; the only entry point |
 | Queue | SQS standard queue + DLQ | 3-minute visibility timeout with worker heartbeat |
 | Failure reporting | DLQ-triggered Lambda | Writes a `.failed` marker to S3, no database needed |
-| Compute | ECS on EC2 (Spot `g5.2xlarge`, `g6.2xlarge` to follow) in an ASG, min size 0 | Worker is a Docker container from ECR |
+| Compute | ECS on EC2 (Spot `g5.2xlarge`; `g6.2xlarge` held back, see plan 06) in an ASG, min size 0 | Worker is a Docker container from ECR |
 | Storage | Two S3 buckets: model weights, generated clips | Weights copied to instance-store NVMe on each boot |
 | Scaling | CloudWatch alarms -> ECS Service Auto Scaling -> capacity provider -> ASG | Scales from and to zero |
 
@@ -50,54 +50,79 @@ Stated plainly, because a design is only worth what has been run.
 
 | Verified | How |
 |---|---|
-| API, worker logic, failure paths, budget cut-off and scale-in handlers | 307 offline tests (pytest, moto, fakes for the queue, S3 and the model), run in CI on every push |
-| Terraform stack | `fmt` and `validate` in CI; applied to a real account (95 resources), reviewed plans kept in [`terraform/plans/`](terraform/plans/) |
+| API, worker logic, failure paths, budget cut-off and scale-in handlers | 383 offline tests (pytest, moto, fakes for the queue, S3 and the model) and 10 front-end tests (`node --test`), run in CI on every push |
+| Terraform stack | `fmt` and `validate` in CI; applied to a real account (95 resources at first), reviewed plans kept in [`terraform/plans/`](terraform/plans/) and [`docs/terraform_plans/`](docs/terraform_plans/) |
 | Login, manifest-driven form, job submit through the real API | Used against the deployed stack |
-| Model on a GPU | Wan 2.1 1.3B on a free Kaggle T4: clean frames, peak 12.7 GiB VRAM, measured speed. See [`docs/wan_spike_findings.md`](docs/wan_spike_findings.md) |
-| A real bug found on that GPU | An aborted job left 2.7 GiB on the GPU, so the next job would run out of memory. Fixed and re-checked on the T4 |
+| The worker on real Spot GPU instances | Ran on `g5.2xlarge` (2026-11-21, 2026-11-22) and `g4dn.2xlarge` (2026-11-22): jobs end to end, clips downloaded from the site |
+| Wan 2.2 5B, text and image to video | Trial 1 (plan 06): 3 s and 5 s clips, an image-to-video clip from a real site upload, two jobs in one process; the owner accepted the clips |
+| Scaling back to zero | Plan 07: an own idle alarm and a scale-in Lambda; the instance is on its way down about 5 minutes after the last upload (measured) |
+| Start-image size check | A start image under 512 px is refused in the browser before the upload, and again by the worker; seen working on the real site |
+| RAM margin of the 5B worker | Measured on a `g5.2xlarge`, see [Memory](#memory-measured-on-the-g5) |
+| Real bugs found on real GPUs | Aborted job left 2.7 GiB on the GPU (T4); tiled VAE decode failed on the 2.2 VAE; fp32 VAE decode ran out of GPU memory; container OOM-killed with the prompt encoder kept in RAM. All fixed and re-run |
 
 | Not yet verified | Why |
 |---|---|
-| The worker image running on a g4dn Spot instance | Needs the Spot quota (requested) and a plan upgrade |
-| Cold-start time, Spot interruption handling on real instances | Same |
-| That the budget cut-off actually stops a running instance | Planned as a go-live test |
+| Spot interruption handling on a real instance | Needs a real Spot withdrawal; release and retry are tested with fakes only |
+| That the budget cut-off stops a running job's instance | Tested with moto; a live-job test is planned (it releases a running job, it does not finish it) |
+| The DLQ alarm firing on a real dead-lettered job | Wired, not triggered yet |
+| `g6.2xlarge` speed | Held back; one pinned job would measure it if `g5` capacity ever runs short |
+| Whether memory grows over many jobs in one process | Anonymous RAM rose from 13.3 to 15.5 GiB between a text and an image job (probably the job type); a third job would tell |
 
 ## Measured so far
 
-**Next model (plan 06, `docs/adr/0005-wan22-5b-and-the-24gb-gpu-floor.md`):** Wan 2.2 TI2V 5B, text-to-video and image-to-video with an optional start image, 1280x704 at 24 fps, on a 24 GB GPU (`g5.2xlarge`; `g6.2xlarge` was held back, see plan 06). `fast` is 30 steps and `high` is 50. It ran on AWS on 2026-11-22 (trial 1, `g5.2xlarge` Spot): text to video 3 s and 5 s, and image to video from a real site upload, two jobs in one process; the owner accepted the clips. A `fast` 3 s clip takes about 6.5 min of GPU and a `fast` 5 s clip about 12.7 min (about 11.6 and 22.3 s per step). The numbers in the Wan 2.1 1.3B tables below are history. The 1.3B weights are deleted from S3.
+Current model (plan 06, [ADR 0005](docs/adr/0005-wan22-5b-and-the-24gb-gpu-floor.md)): Wan 2.2 TI2V 5B, text to video and image to video with an optional start image, 1280x704 at 24 fps, on a 24 GB GPU (`g5.2xlarge`, A10G). Two quality levels, both at 1280x704: `fast` is 30 steps and `high` is 50.
 
-Model measured so far: Wan 2.1 T2V 1.3B on a Tesla T4. Two quality levels are exposed as a manifest parameter:
+Measured on a `g5.2xlarge` Spot instance, 2026-11-22 (plan 06 trial 1 and the RAM run):
 
-| Level | Size | Steps | 3 s clip |
-|---|---|---|---|
-| `fast` (default) | 832x480 | 30 | about 13.5 min on the T4 (Kaggle, 808 s); 200 s on a g5.2xlarge (AWS, 2026-11-21) |
-| `high` | 832x480 | 50 | 1050 s (17.5 min) on a g4dn.2xlarge T4 (AWS, 2026-11-22, 19.4 s per step); about 21 min on the Kaggle T4; about 5 min on a g5.2xlarge (my estimate, not measured) |
+| Clip | Steps | Seconds per step | GPU seconds | Peak GPU memory | GPU cost (my arithmetic at about $0.8 an hour) |
+|---|---|---|---|---|---|
+| 3 s text, `fast` | 30 | 11.6 | 420.5 | 12.6 GiB | about $0.09 |
+| 3 s image to video, `fast` | 30 | 11.6 | 389.6 | 13.9 GiB | about $0.09 |
+| 5 s text, `fast` | 30 | 22.3 | 763.7 | 14.6 GiB | about $0.17 |
+| 5 s image to video, `fast` | 30 | 22.3 | 731.9 | 15.9 GiB | about $0.16 |
+| 5 s text, `high` | 50 | 22.3 | 1209.6 | 14.6 GiB | about $0.27 |
 
-Both levels use Wan's own recommended settings for the 1.3B model (guidance 6, flow_shift 8, Wan's default negative prompt). The first AWS test used flow_shift 3.0, which blew the colours out; plan 05 (`_plans/05_quality_variants.md`) found and fixed that. The 640x368 size of the first spike was dropped: it is below the 480p the model was trained for. Cold start from launch to a ready worker was 6 min 17 s on a g5 and 6 min 34 s on a g4dn (measured). The worker image is 4.16 GB compressed. Weights are 28.9 GB. Spot prices checked on 2026-11-22 (us-west-2): g4dn.2xlarge $0.29 to $0.32 an hour, g5.2xlarge $0.69 to $0.90 an hour. GPU cost per `high` clip is about $0.09 on the g4dn (1050 s measured) and about $0.06 to $0.08 on the g5 (the g5 time is not measured), plus cold start (about 6.5 min, about $0.03 on the g4dn). The instance then stays up for an idle wait of about 5 minutes (measured after plan 07; it was about 33 billed minutes before), about $0.03 on the g4dn and $0.06 to $0.08 on the g5. A whole wake-up with a `fast` job on the g4dn (launch to termination start, about 23 min) came to about $0.11 (my arithmetic from the Spot price).
+GPU memory is of the A10G's 22.06 GiB usable. A whole wake-up also pays the cold start and the idle wait: launch to a ready worker took about 7 minutes with only the 5B weights in S3 (about 9 minutes when 63 GB of weights were there), and the instance stays up about 5 minutes after the last upload. Two 5 s clips in one wake-up came to about 40 minutes of `g5` and about $0.5 (my estimate). Spot prices checked on 2026-11-22 (us-west-2): `g5.2xlarge` $0.68 to $0.90 an hour.
+
+### Memory (measured on the g5)
+
+The worker container has a 29 GiB limit (the instance has 32 GiB). The worker's log line "peak RAM" read 27 to 28 GiB, which looked like a margin of 1 GiB. It is not: that number counts memory-mapped weight files (the transformer is stored as fp32 shards and read as bf16), which the kernel can drop at any time. The worker now logs a split of anonymous memory, which is the part that can get a container killed, and file pages, for the process and for the container's own counters. Two 5 s jobs in one process (a text clip, then an image-to-video clip):
+
+| Moment | Anonymous RAM | File pages in the container |
+|---|---|---|
+| After loading the model | 11.2 GiB | 10.5 GiB |
+| After the first job (text) | 13.3 GiB | 14.1 GiB |
+| After the second job (image to video) | 15.5 GiB | 12.2 GiB |
+
+Real memory use peaked at 15.5 GiB, about 13 GiB under the limit. The container's own peak counter reached 29.0 GiB because file cache fills up to the limit, and the kernel reclaims it; nothing was killed. The earlier out-of-memory kill happened when the 11.4 GB prompt encoder was held in RAM; it is now loaded for each job straight to the GPU and dropped before denoising. Details: [`_plans/06_wan22_ti2v_5b.md`](_plans/06_wan22_ti2v_5b.md).
+
+History: the first model was Wan 2.1 T2V 1.3B at 832x480 (a Kaggle T4, then `g5` and `g4dn` on AWS). Its settings problem (flow_shift 3.0 blew the colours out) was found and fixed in plan 05. Its weights are deleted from S3, and the code stays in `worker/wan.py` as a parked path.
 
 ## Cost model
 
-Idle cost is a handful of small standing items: model weights in S3, ECR image storage, and a few CloudWatch alarms. There is no NAT gateway, ALB or interface endpoint. GPU cost applies from the moment an instance launches until it is gone: cold start, the job, and the idle wait (about 5 minutes measured since plan 07).
+Idle cost is a handful of small standing items: model weights in S3, ECR image storage, and a few CloudWatch alarms. There is no NAT gateway, ALB or interface endpoint. GPU cost applies from the moment an instance launches until it is gone: cold start (about 7 minutes), the job, and the idle wait (about 5 minutes since plan 07; it was about 33 before).
 
 Per-user cost is tracked through usage logs: the worker records GPU seconds per job, and the API records bytes per download. A saved CloudWatch Logs Insights query sums them per user, and each user's share is applied to the monthly bill. See section 3H of the spec.
 
-Idle cost is estimated at about $1 to $3 a month (weights in S3 about $0.65, the image in ECR about $0.42). The real figures, and cold-start time, will replace these after the first run on AWS.
+Idle cost is estimated at about $1 to $3 a month (weights in S3 about $0.8 for 34 GB, the image in ECR about $0.42; my arithmetic). These are estimates; they have not been checked against the Billing console.
 
 ## Repository layout
 
 ```
 docs/
   architecture/DRAFT_architecture.md   Architecture spec (source of truth)
-  adr/                                 Decision records (no database, no NAT, weights on NVMe, budget cut-off)
+  adr/                                 Decision records (no database, no NAT, weights on NVMe, budget cut-off, Wan 2.2 5B)
+  runbook_stop_gpu.md                  How to stop the GPU now, including a running job
+  terraform_plans/                     Reviewed plan output for later changes (redacted)
   wan_spike_findings.md                GPU spike results and the bug it found
   huggingFace_to_s3_instructions.md    Runbook: copy model weights from Hugging Face to S3
 _plans/                                Build order and feature plans
 System_Diagrams/                       draw.io diagrams (FINAL is current)
 terraform/                             The AWS stack (deployed 2026-11-18); plans/ holds reviewed plan output
-tests/                                 Offline test suite (275 tests)
+tests/                                 Offline test suite (383 pytest tests, 10 front-end node tests)
 spike/                                 Kaggle notebooks used for the GPU spike
 .github/workflows/ci.yml               CI: pytest, terraform fmt and validate
-lambdas/                               API, failure-marker and budget cut-off Lambdas; common/ is shared with the worker
+lambdas/                               API, failure-marker, budget cut-off and scale-in Lambdas; common/ is shared with the worker
 worker/                                The GPU worker container (Dockerfile, pinned requirements, `python -m worker`)
 scripts/build_api.sh                   Builds the API Lambda bundle
 scripts/build_push.sh                  Builds the worker image and pushes it to ECR
@@ -113,15 +138,21 @@ frontend/                              Static web app (vanilla JS, mock mode)
 - [x] GPU worker container, built and pushed to ECR
 - [x] Web front end
 - [x] GPU spike on a Kaggle T4, model weights in S3
-- [ ] Spot quota approved, plan upgraded, first job on a real GPU instance
-- [ ] Measure real cost and cold-start time, and update this README
+- [x] Spot quota approved, plan upgraded, first jobs on a real GPU instance
+- [x] Cold start, idle wait and per-clip GPU time measured
+- [x] Wan 2.2 5B, text and image to video, accepted
+- [x] Fast scale-in (plan 07), start-image size check, RAM margin measured
+- [ ] Spot interruption test on a real instance
+- [ ] Budget cut-off with a live job
+- [ ] Portrait and aspect-ratio option (outputs are fixed landscape 1280x704)
+- [ ] Friends' Cognito users and a go-live check of the real bill
 
 The detailed checklist is [`_plans/01_build_order.md`](_plans/01_build_order.md).
 
-## Pre-deploy notes
+## Account notes
 
-- Request a Spot service-quota increase for "All G and VT Spot Instance Requests" in `us-west-2`. New accounts often have 0. (Requested for 8 vCPU, pending.)
-- The GPU instance types are not available on the AWS Free plan, so go-live needs a plan upgrade.
+- GPU instance types are not available on the AWS Free plan, so the account was upgraded to Paid on 2026-11-21. The Spot quota for "All G and VT Spot Instance Requests" in `us-west-2` covers one `g5.2xlarge` (8 vCPU) at a time.
+- The GPU limits (ASG max size and the service's autoscaling max) stay at 0 between tests and are raised by hand; Terraform ignores them on purpose so an apply cannot undo a budget cut-off.
 
 ## Deploying
 
