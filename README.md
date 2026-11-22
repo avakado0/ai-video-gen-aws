@@ -64,7 +64,7 @@ Stated plainly, because a design is only worth what has been run.
 
 ## Measured so far
 
-**Next model (plan 06, `docs/adr/0005-wan22-5b-and-the-24gb-gpu-floor.md`):** Wan 2.2 TI2V 5B, text-to-video and image-to-video with an optional start image, 1280x704 at 24 fps, on a 24 GB GPU (`g5.2xlarge`, then `g6.2xlarge`). `fast` is 30 steps and `high` is 50. It ran on AWS on 2026-11-22 (trial 1, `g5.2xlarge` Spot): text to video 3 s and 5 s, and image to video from a real site upload, two jobs in one process; the owner accepted the clips. A `fast` 3 s clip takes about 6.5 min of GPU and a `fast` 5 s clip about 12.7 min (about 11.6 and 22.3 s per step). The numbers in the Wan 2.1 1.3B tables below are history. Next: the owner deletes the 1.3B weights from S3, then `g6.2xlarge` is added with one confirmation run.
+**Next model (plan 06, `docs/adr/0005-wan22-5b-and-the-24gb-gpu-floor.md`):** Wan 2.2 TI2V 5B, text-to-video and image-to-video with an optional start image, 1280x704 at 24 fps, on a 24 GB GPU (`g5.2xlarge`; `g6.2xlarge` was held back, see plan 06). `fast` is 30 steps and `high` is 50. It ran on AWS on 2026-11-22 (trial 1, `g5.2xlarge` Spot): text to video 3 s and 5 s, and image to video from a real site upload, two jobs in one process; the owner accepted the clips. A `fast` 3 s clip takes about 6.5 min of GPU and a `fast` 5 s clip about 12.7 min (about 11.6 and 22.3 s per step). The numbers in the Wan 2.1 1.3B tables below are history. The 1.3B weights are deleted from S3.
 
 Model measured so far: Wan 2.1 T2V 1.3B on a Tesla T4. Two quality levels are exposed as a manifest parameter:
 
