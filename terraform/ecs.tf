@@ -32,9 +32,12 @@ resource "aws_ecs_task_definition" "worker" {
       essential = true
 
       # One job at a time, so the task takes the whole instance: a g5.2xlarge (and the
-      # g6.2xlarge to come) has 8 vCPU and 32 GB RAM. The 5B model in bf16 keeps about 24 GB
-      # of weights in RAM with CPU offload (my estimate, unmeasured: trial 1 shows whether
-      # this 29 GiB limit is enough). Leave a little for the OS and the ECS agent.
+      # g6.2xlarge to come) has 8 vCPU and 32 GB RAM. Trial 1 (plan 06, 2026-11-22): with the transformer,
+      # VAE and prompt encoder all kept in RAM (about 24 GB of weights, load peak 27.5 to 28.5 GiB) the
+      # container was OOM-killed (exit 137) at this 29 GiB limit while denoising a second job. The
+      # worker now loads the prompt encoder per job and drops it (worker/wan22.py), which takes about
+      # 11 GB out of the long-lived footprint (my estimate; the trial shows the real figure).
+      # Leave a little for the OS and the ECS agent.
       cpu    = 7168
       memory = 29696
 
