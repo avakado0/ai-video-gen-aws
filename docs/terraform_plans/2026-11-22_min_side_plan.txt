@@ -1,0 +1,180 @@
+# terraform plan, 2026-11-22, for the start-image size check (manifest min_side, front-end files). Reviewed before apply.
+# Refresh lines (resource ids) are left out; everything from the execution plan on is unchanged.
+
+Terraform used the selected providers to generate the following execution
+plan. Resource actions are indicated with the following symbols:
+  + create
+  ~ update in-place
+-/+ destroy and then create replacement
+
+Terraform will perform the following actions:
+
+  # aws_ecs_service.worker will be updated in-place
+  ~ resource "aws_ecs_service" "worker" {
+        id                                 = "arn:aws:ecs:us-west-2:477656043770:service/aivideogen/aivideogen-worker"
+        name                               = "aivideogen-worker"
+        tags                               = {}
+      ~ task_definition                    = "arn:aws:ecs:us-west-2:477656043770:task-definition/aivideogen-worker:3" -> (known after apply)
+        # (15 unchanged attributes hidden)
+
+        # (3 unchanged blocks hidden)
+    }
+
+  # aws_ecs_task_definition.worker must be replaced
+-/+ resource "aws_ecs_task_definition" "worker" {
+      ~ arn                      = "arn:aws:ecs:us-west-2:477656043770:task-definition/aivideogen-worker:3" -> (known after apply)
+      ~ arn_without_revision     = "arn:aws:ecs:us-west-2:477656043770:task-definition/aivideogen-worker" -> (known after apply)
+      ~ container_definitions    = jsonencode(
+          ~ [
+              ~ {
+                  ~ environment          = [
+                        # (2 unchanged elements hidden)
+                        {
+                            name  = "MODELS_DIR"
+                            value = "/data/models"
+                        },
+                      ~ {
+                            name  = "MODEL_MANIFEST"
+                          ~ value = jsonencode(
+                              ~ {
+                                  ~ inputs = [
+                                      ~ {
+                                          + min_side  = 512
+                                            name      = "image"
+                                            # (6 unchanged attributes hidden)
+                                        },
+                                    ]
+                                    # (4 unchanged attributes hidden)
+                                }
+                            )
+                        },
+                        {
+                            name  = "QUEUE_URL"
+                            value = "https://sqs.us-west-2.amazonaws.com/477656043770/aivideogen-jobs"
+                        },
+                    ]
+                    name                 = "worker"
+                  - portMappings         = []
+                  - systemControls       = []
+                  - volumesFrom          = []
+                    # (9 unchanged attributes hidden)
+                },
+            ] # forces replacement
+        )
+      ~ enable_fault_injection   = false -> (known after apply)
+      ~ id                       = "aivideogen-worker" -> (known after apply)
+      ~ revision                 = 3 -> (known after apply)
+      - tags                     = {} -> null
+        # (12 unchanged attributes hidden)
+
+      - volume {
+          - configure_at_launch = false -> null
+          - host_path           = "/data" -> null
+          - name                = "data" -> null
+        }
+      + volume {
+          + configure_at_launch = (known after apply)
+          + host_path           = "/data"
+          + name                = "data"
+        }
+    }
+
+  # aws_lambda_function.api will be updated in-place
+  ~ resource "aws_lambda_function" "api" {
+        id                             = "aivideogen-api"
+        tags                           = {}
+        # (29 unchanged attributes hidden)
+
+      ~ environment {
+          ~ variables = {
+              ~ "MODEL_MANIFEST"       = jsonencode(
+                  ~ {
+                      ~ inputs = [
+                          ~ {
+                              + min_side  = 512
+                                name      = "image"
+                                # (6 unchanged attributes hidden)
+                            },
+                        ]
+                        # (4 unchanged attributes hidden)
+                    }
+                )
+                # (4 unchanged elements hidden)
+            }
+        }
+
+        # (3 unchanged blocks hidden)
+    }
+
+  # aws_lambda_function.budget_cutoff will be updated in-place
+  ~ resource "aws_lambda_function" "budget_cutoff" {
+        id                             = "aivideogen-budget-cutoff"
+      ~ last_modified                  = "2026-11-18T14:22:28.233+0000" -> (known after apply)
+      ~ source_code_hash               = "UUblVhA39AbfppnCedQGe8N3R4dVN833m0lbBA1avTA=" -> "rah3TWpWBSr+efuzmshJiSmQ4HRTr/s1iEmh0pXBkPI="
+        tags                           = {}
+        # (27 unchanged attributes hidden)
+
+        # (4 unchanged blocks hidden)
+    }
+
+  # aws_s3_object.frontend["js/api/ApiClient.js"] will be updated in-place
+  ~ resource "aws_s3_object" "frontend" {
+      ~ etag                          = "244862a1fcee260d0e7ede19942380da" -> "1a9b31b54e9a2d8bbf40fe2c3c3aa9d6"
+        id                            = "js/api/ApiClient.js"
+        tags                          = {}
+      + version_id                    = (known after apply)
+        # (24 unchanged attributes hidden)
+    }
+
+  # aws_s3_object.frontend["js/form.js"] will be updated in-place
+  ~ resource "aws_s3_object" "frontend" {
+      ~ etag                          = "109df68d32e57be3d0f5331f488e1989" -> "960891cbb19f2e93915d9e9181b14e2e"
+        id                            = "js/form.js"
+        tags                          = {}
+      + version_id                    = (known after apply)
+        # (24 unchanged attributes hidden)
+    }
+
+  # aws_s3_object.frontend["js/imagesize.js"] will be created
+  + resource "aws_s3_object" "frontend" {
+      + acl                    = (known after apply)
+      + arn                    = (known after apply)
+      + bucket                 = "aivideogen-web-477656043770"
+      + bucket_key_enabled     = (known after apply)
+      + checksum_crc32         = (known after apply)
+      + checksum_crc32c        = (known after apply)
+      + checksum_crc64nvme     = (known after apply)
+      + checksum_sha1          = (known after apply)
+      + checksum_sha256        = (known after apply)
+      + content_type           = "text/javascript; charset=utf-8"
+      + etag                   = "32d1e34cdc3ab57c19c165666cb42a3f"
+      + force_destroy          = false
+      + id                     = (known after apply)
+      + key                    = "js/imagesize.js"
+      + kms_key_id             = (known after apply)
+      + server_side_encryption = (known after apply)
+      + source                 = "./../frontend/js/imagesize.js"
+      + storage_class          = (known after apply)
+      + tags_all               = {
+          + "ManagedBy" = "Terraform"
+          + "Project"   = "AIVideoGen"
+        }
+      + version_id             = (known after apply)
+    }
+
+  # aws_s3_object.frontend["js/mock/manifests/text-image.json"] will be updated in-place
+  ~ resource "aws_s3_object" "frontend" {
+      ~ etag                          = "0411dbc90f736764914439c8c106edc2" -> "bf7c35569db54889b77b8eea7d4ec990"
+        id                            = "js/mock/manifests/text-image.json"
+        tags                          = {}
+      + version_id                    = (known after apply)
+        # (24 unchanged attributes hidden)
+    }
+
+Plan: 2 to add, 6 to change, 1 to destroy.
+
+─────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't
+guarantee to take exactly these actions if you run "terraform apply" now.
+Releasing state lock. This may take a few moments...
