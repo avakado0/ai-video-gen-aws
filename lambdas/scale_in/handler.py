@@ -11,8 +11,9 @@ but only if everything says idle:
 
 Then it clears scale-in protection on the group's instances and sets the ASG's desired capacity
 to 0. It never touches MinSize or MaxSize (the budget cut-off owns those, ADR 0004) and never
-raises anything. If the check or a call fails the error is raised, so Lambda retries the
-(idempotent) invocation. The capacity provider's own scale-in stays as the fallback.
+raises anything. If a call fails, or the service wants 0 tasks but still counts some (the event can
+beat the counts by a few seconds), the error is raised, so Lambda retries the (idempotent)
+invocation after a minute or two. The capacity provider's own scale-in stays as the fallback.
 
 A job that arrives in the seconds between the checks and the update is not lost: the wake alarm
 raises the service to 1 and the capacity provider raises the ASG again, a delay of a minute or two.
@@ -28,6 +29,11 @@ import boto3
 
 class ScaleInFailed(Exception):
     """A call failed; raised so Lambda retries the invocation."""
+
+
+class TasksStillStopping(Exception):
+    """The service wants 0 tasks but still counts some. The "task stopped" event can arrive seconds
+    before the counts catch up; raised so Lambda retries in a minute or two."""
 
 
 def _setting(name):
@@ -60,7 +66,11 @@ def _service_is_idle(ecs, cluster, service):
     if not found:
         raise ScaleInFailed("worker service not found")
     s = found[0]
-    return s["desiredCount"] == 0 and s["runningCount"] == 0 and s["pendingCount"] == 0
+    if s["desiredCount"] > 0:
+        return False
+    if s["runningCount"] > 0 or s["pendingCount"] > 0:
+        raise TasksStillStopping("service wants 0 tasks but still counts some")
+    return True
 
 
 def lambda_handler(event, context):

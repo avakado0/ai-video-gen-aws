@@ -148,7 +148,7 @@ def test_a_service_that_wants_a_task_means_not_idle(aws):
     assert untouched(aws)
 
 
-def test_running_or_pending_tasks_mean_not_idle(aws, monkeypatch):
+def _service_counts(monkeypatch, **counts):
     real = boto3.client
 
     def client(name, *a, **k):
@@ -158,15 +158,36 @@ def test_running_or_pending_tasks_mean_not_idle(aws, monkeypatch):
 
             def describe_services(**kw):
                 out = describe(**kw)
-                out["services"][0]["runningCount"] = 1
+                out["services"][0].update(counts)
                 return out
 
             c.describe_services = describe_services
         return c
 
     monkeypatch.setattr(scale_in.boto3, "client", client)
-    result = scale_in.lambda_handler(STOPPED_EVENT, None)
-    assert result["reason"] == "service_active"
+
+
+def test_tasks_still_stopping_are_retried_not_ignored(aws, monkeypatch):
+    # The "task stopped" event can arrive a few seconds before the service's running count drops
+    # to 0. Desired 0 with a task still counted means it is stopping, not busy: raise so Lambda
+    # retries in a minute or two, instead of leaving the instance to the 15-minute fallback.
+    _service_counts(monkeypatch, runningCount=1)
+    with pytest.raises(scale_in.TasksStillStopping):
+        scale_in.lambda_handler(STOPPED_EVENT, None)
+    assert untouched(aws)
+
+
+def test_a_pending_task_is_also_retried(aws, monkeypatch):
+    _service_counts(monkeypatch, pendingCount=1)
+    with pytest.raises(scale_in.TasksStillStopping):
+        scale_in.lambda_handler(STOPPED_EVENT, None)
+    assert untouched(aws)
+
+
+def test_a_service_that_wants_tasks_is_not_retried(aws, monkeypatch):
+    # desired above 0: the service is working, a stopped task is a restart or a crash. No retry.
+    _service_counts(monkeypatch, desiredCount=1, runningCount=1)
+    assert scale_in.lambda_handler(STOPPED_EVENT, None)["reason"] == "service_active"
     assert untouched(aws)
 
 
