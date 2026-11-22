@@ -20,8 +20,8 @@ straight to the GPU (it is free then: the transformer is still on the CPU), enco
 the negative prompt, and drops the encoder before denoising starts. The pipelines take the
 embeddings instead of the text.
 
-Not run on a GPU yet. That the image pipeline accepts this wiring (read from diffusers 0.35.2's
-source, not executed) is what trial 1(c) on AWS shows.
+Run on AWS (plan 06 trial 1, 2026-11-22, g5.2xlarge): text to video 3 s and 5 s, image to video, and
+two jobs in one process all worked.
 
 torch, diffusers and Pillow are imported inside methods, so the rest of the worker (and its tests)
 load without them. The module shares helpers with wan.py, the parked 1.3B path, by importing them.
