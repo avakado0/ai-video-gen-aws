@@ -17,9 +17,9 @@ Set these once in your local shell. Keep them the same across all steps.
 ```bash
 export REGION=us-west-2
 export BUCKET=aivideogen-models-477656043770   # S3 names are global; pick a unique one and use it everywhere
-export MODEL=wan2-1-t2v-1-3b                        # must match models/<model-name>/ in user_data and model_manifest.json
-export HF_REPO=Wan-AI/Wan2.1-T2V-1.3B-Diffusers
-export HF_SHA=0fad780a534b6463e45facd96134c9f345acfa5b
+export MODEL=wan2-2-ti2v-5b                        # must match models/<model-name>/ in user_data and model_manifest.json
+export HF_REPO=Wan-AI/Wan2.2-TI2V-5B-Diffusers
+export HF_SHA=b8fff7315c768468a5333511427288870b2e9635
 export MY_IP=$(curl -s https://checkip.amazonaws.com)
 ```
 
@@ -87,9 +87,9 @@ aws ec2 authorize-security-group-ingress --region "$REGION" --group-id "$SG_ID" 
 ### 1d. Launch the instance
 
 * **Region:** `us-west-2`, the same region as the bucket. The region must match exactly: a cross-region copy is billed as data transfer.
-* **Instance type:** `m7i-flex.large` (2 vCPU, 8 GB RAM, up to 12.5 Gbps network), so a 29 GB model copies in minutes. The account is on the AWS Free plan, which only launches Free-eligible types (`t3.micro`, `t3.small`, `t4g.micro`, `t4g.small`, `c7i-flex.large`, `m7i-flex.large`); `m5.xlarge` and `c5.xlarge` are refused. `t3.small` also works but has only about 0.25 Gbps baseline (about 30 MB/s), so the copy takes much longer. Check the list first: `aws ec2 describe-instance-types --region us-west-2 --filters Name=free-tier-eligible,Values=true --query "InstanceTypes[].InstanceType" --output text`. If `m7i-flex.large` is missing from it, stop and ask; do not upgrade the account to get around it.
+* **Instance type:** `m7i-flex.large` (2 vCPU, 8 GB RAM, up to 12.5 Gbps network), so a 34 GB model copies in minutes. The account is on the AWS Free plan, which only launches Free-eligible types (`t3.micro`, `t3.small`, `t4g.micro`, `t4g.small`, `c7i-flex.large`, `m7i-flex.large`); `m5.xlarge` and `c5.xlarge` are refused. `t3.small` also works but has only about 0.25 Gbps baseline (about 30 MB/s), so the copy takes much longer. Check the list first: `aws ec2 describe-instance-types --region us-west-2 --filters Name=free-tier-eligible,Values=true --query "InstanceTypes[].InstanceType" --output text`. If `m7i-flex.large` is missing from it, stop and ask; do not upgrade the account to get around it.
 * **AMI:** **Amazon Linux 2023**. Do not use Amazon Linux 2: its `python3-pip` is Python 3.7, which installs an ancient `huggingface_hub` that may have no `hf` command.
-* **Extra EBS volume:** 40 GB `gp3`, which is the model (about 29 GB) plus headroom. The production cap is 225 GB, and this volume is only for this temporary instance. Production workers keep weights on the instance store, not EBS. **Delete on termination must be on**, or the volume survives Step 4 as a billed orphan.
+* **Extra EBS volume:** 60 GB `gp3`, which is the model (about 34 GB) plus headroom. The production cap is about 450 GB (`g5.2xlarge`), and this volume is only for this temporary instance. Production workers keep weights on the instance store, not EBS. **Delete on termination must be on**, or the volume survives Step 4 as a billed orphan.
 * **Shutdown behavior:** terminate. This makes `sudo shutdown -h now` at the end of Step 3 also end billing.
 
 ```bash
@@ -122,7 +122,7 @@ Remaining steps run on the instance, unless marked otherwise.
 
 ## Step 2: Format and Mount the Extra Volume
 
-Check the device name with `lsblk`. It is often `/dev/nvme1n1`. The 40 GB volume will show no mount point and no filesystem. Confirm both before formatting: formatting the wrong device destroys data.
+Check the device name with `lsblk`. It is often `/dev/nvme1n1`. The 60 GB volume will show no mount point and no filesystem. Confirm both before formatting: formatting the wrong device destroys data.
 
 ```bash
 lsblk
@@ -173,20 +173,20 @@ Set the variables again in the new shell (they are not inherited from your lapto
 ```bash
 export REGION=us-west-2
 export BUCKET=aivideogen-models-477656043770   # same value as Step 1
-export MODEL=wan2-1-t2v-1-3b
-export HF_REPO=Wan-AI/Wan2.1-T2V-1.3B-Diffusers
-export HF_SHA=0fad780a534b6463e45facd96134c9f345acfa5b
+export MODEL=wan2-2-ti2v-5b
+export HF_REPO=Wan-AI/Wan2.2-TI2V-5B-Diffusers
+export HF_SHA=b8fff7315c768468a5333511427288870b2e9635
 ```
 
 ### 3c. Download
 
-The download goes to `/data`, which is the 40 GB volume from Step 2.
+The download goes to `/data`, which is the 60 GB volume from Step 2.
 
-Download only the files the worker needs. Many repos ship the same weights in several formats (`.safetensors` plus `.bin`, `.onnx`, or fp32 and fp16 variants). Every unneeded GB costs S3 storage and adds copy time to every Spot cold boot, and it eats into the 225 GB instance-store cap. Check the repo's file list on Hugging Face first, then filter with `--include` (or `--exclude`).
+Download only the files the worker needs. Many repos ship the same weights in several formats (`.safetensors` plus `.bin`, `.onnx`, or fp32 and fp16 variants). Every unneeded GB costs S3 storage and adds copy time to every Spot cold boot, and it eats into the instance-store cap. Check the repo's file list on Hugging Face first, then filter with `--include` (or `--exclude`).
 
 Pin the exact commit with `--revision`, so the weights in S3 are reproducible even if the repo is updated later. The commit SHA is in the repo's "History" tab on Hugging Face.
 
-The v1 model is **Wan 2.1 T2V 1.3B in Diffusers format**, repo `Wan-AI/Wan2.1-T2V-1.3B-Diffusers`, pinned to commit `0fad780a534b6463e45facd96134c9f345acfa5b` (ungated, Apache-2.0, about 29 GB total). The worker loads it with `diffusers.WanPipeline`, which needs this layout (`model_index.json` plus `text_encoder/`, `tokenizer/`, `transformer/`, `vae/`, `scheduler/` folders). The original `Wan-AI/Wan2.1-T2V-1.3B` repo uses a different layout and does not load in `diffusers`. Everything is `.safetensors` or small config files. The UMT5 text encoder is stored in fp32 (about 22.7 GB), which is why this repo is larger than the original. The filter below excludes only the docs and sample assets, about 7 MB of extras.
+The v1 model (plan 06, ADR 0005) is **Wan 2.2 TI2V 5B in Diffusers format**, repo `Wan-AI/Wan2.2-TI2V-5B-Diffusers`, pinned to commit `b8fff7315c768468a5333511427288870b2e9635` (ungated, Apache-2.0, 34.2 GB total, checked on the Hugging Face file list on 2026-11-22: the transformer is 5 fp32 shards of about 20 GB, the text encoder 3 shards of 11.4 GB, the VAE 2.8 GB, plus tokenizer and configs). The worker loads it with `diffusers.WanPipeline` (and `WanImageToVideoPipeline` for a start image), which needs this layout (`model_index.json` plus `text_encoder/`, `tokenizer/`, `transformer/`, `vae/`, `scheduler/` folders). The same exclude patterns below drop the `assets/` and `examples/` folders and the README, about 2 MB of extras. The previous model, `Wan-AI/Wan2.1-T2V-1.3B-Diffusers` at commit `0fad780a534b6463e45facd96134c9f345acfa5b` (about 29 GB), is the parked path: its weights stay in S3 until the 5B trial is accepted and are then deleted by hand, because every boot copies the whole `models/` prefix. Rolling back to it afterwards means running this runbook again with `MODEL=wan2-1-t2v-1-3b` and those two values.
 
 ```bash
 hf download "$HF_REPO" \
@@ -238,7 +238,7 @@ Detach from tmux with `Ctrl-b d`. Then continue to Step 4 from your own machine 
 
 1. Confirm the byte counts matched in Step 3e.
 2. **Terminate the temporary EC2 instance** so you do not accrue hourly charges or EBS storage fees. If you set shutdown behavior to terminate in Step 1d, `sudo shutdown -h now` does this for you. Otherwise run `aws ec2 terminate-instances --region "$REGION" --instance-ids "$INSTANCE_ID"`.
-3. Confirm the extra EBS volume is gone: `aws ec2 describe-volumes --region "$REGION" --filters Name=status,Values=available` should list no 40 GB volume. Delete any leftover volume.
+3. Confirm the extra EBS volume is gone: `aws ec2 describe-volumes --region "$REGION" --filters Name=status,Values=available` should list no 60 GB volume. Delete any leftover volume.
 4. Delete the temporary access, which is no longer needed:
 
    ```bash

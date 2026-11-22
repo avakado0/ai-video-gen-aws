@@ -4,7 +4,7 @@
 
 A cost-optimized, serverless-front / GPU-back architecture for generating AI video clips on demand. The design goal is **near-zero cost when idle**: GPU capacity only exists while jobs are in the queue.
 
-Built end to end by one person on a $100 AWS credit: Terraform (17 files), a FastAPI Lambda, a GPU worker container, a no-build web front end, and 307 offline tests. Developed test-first.
+Built end to end by one person on a $100 AWS credit: Terraform (17 files), a FastAPI Lambda, a GPU worker container, a no-build web front end, and 354 offline tests. Developed test-first.
 
 > **Status (2026-11-20): everything except the first GPU run is built and deployed.**
 > The stack is applied with the GPU limit at zero, so it costs almost nothing. The model code has run on a Kaggle T4, the worker image is built and pushed to ECR, and the model weights are in S3. What has not happened yet is the first job on a real AWS GPU instance. See [What is verified](#what-is-verified).
@@ -24,7 +24,7 @@ A small, invite-only group of users logs in to a web app, submits a text prompt,
 | API | API Gateway (HTTP API) + one Lambda running FastAPI via Mangum | JWT authorizer; the only entry point |
 | Queue | SQS standard queue + DLQ | 3-minute visibility timeout with worker heartbeat |
 | Failure reporting | DLQ-triggered Lambda | Writes a `.failed` marker to S3, no database needed |
-| Compute | ECS on EC2 (Spot `g4dn.2xlarge` / `g5.2xlarge`) in an ASG, min size 0 | Worker is a Docker container from ECR |
+| Compute | ECS on EC2 (Spot `g5.2xlarge`, `g6.2xlarge` to follow) in an ASG, min size 0 | Worker is a Docker container from ECR |
 | Storage | Two S3 buckets: model weights, generated clips | Weights copied to instance-store NVMe on each boot |
 | Scaling | CloudWatch alarms -> ECS Service Auto Scaling -> capacity provider -> ASG | Scales from and to zero |
 
@@ -41,7 +41,7 @@ These are the tradeoffs the design is built around.
 - **Spot interruption is a release, not a failure.** On the 2-minute warning the worker aborts and sets the message visibility to 0, so another worker retries immediately. Interruptions never write a failure marker. With no warning, the message reappears after the visibility timeout: delayed, not lost.
 - **Failure reporting without a database.** A permanent error makes the worker write `clips/{sub}/{job_id}.failed` itself. Crashes and repeated failures end up in the DLQ, and a Lambda writes the same marker. `GET /jobs/{id}` reports `ready`, `failed` or `pending` from S3 alone.
 - **Per-user isolation.** The API takes the user's `sub` from verified JWT claims, never from the request body, and validates `job_id` as a UUID, so users can't reach each other's `clips/{sub}/` prefix.
-- **Model weights live in S3 and are copied to instance-store NVMe on boot.** No EBS volumes to pay for or snapshot. The 225 GB `g4dn.2xlarge` instance store is the size cap.
+- **Model weights live in S3 and are copied to instance-store NVMe on boot.** No EBS volumes to pay for or snapshot. The `g5.2xlarge` instance store (about 450 GB) is the size cap.
 - **Pre-signed URLs are minted by the API Lambda, not the worker.** Any pre-signed URL dies when the credentials that signed it expire, and the Lambda's temporary credentials can expire before the 6-hour `ExpiresIn` too. What makes it work is that the API signs a fresh URL on every `GET /jobs/{job_id}`, and the client re-requests on a 403. A worker signs once, at upload, and cannot refresh.
 
 ## What is verified
@@ -64,7 +64,9 @@ Stated plainly, because a design is only worth what has been run.
 
 ## Measured so far
 
-Model: Wan 2.1 T2V 1.3B on a Tesla T4. Two quality levels are exposed as a manifest parameter:
+**Next model (plan 06, `docs/adr/0005-wan22-5b-and-the-24gb-gpu-floor.md`):** Wan 2.2 TI2V 5B, text-to-video and image-to-video with an optional start image, 1280x704 at 24 fps, on a 24 GB GPU (`g5.2xlarge`, then `g6.2xlarge`). `fast` is 30 steps and `high` is 50. The code, manifest and Terraform for it are written and tested with fake pipelines, but it has not run on a GPU yet; the deployed stack and every number below are still the Wan 2.1 1.3B model. Copying the 5B weights, rebuilding the image and a first trial run on AWS come next.
+
+Model measured so far: Wan 2.1 T2V 1.3B on a Tesla T4. Two quality levels are exposed as a manifest parameter:
 
 | Level | Size | Steps | 3 s clip |
 |---|---|---|---|
