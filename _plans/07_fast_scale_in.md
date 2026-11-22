@@ -43,3 +43,7 @@ Idle wait about `idle_minutes` (3) plus the Lambda and termination, so 5 to 8 mi
 
 - Whether ECS clears the instance protection by itself soon after the last task stops, or only on its own slow cycle (the 6-minute drain). The Lambda clears it explicitly, so the first measuring run shows whether that is enough.
 - Whether `SetInstanceProtection` on an instance of an ECS-managed ASG is accepted. If AWS refuses, fall back to `TerminateInstanceInAutoScalingGroup` with `ShouldDecrementDesiredCapacity`.
+
+## Found at the first plan (2026-11-22)
+
+The owner's `terraform plan` showed 9 to add and 3 to change, not the 1 change expected. The extra changes were the launch template `image_id` (AWS published a newer recommended ECS GPU AMI in the SSM parameter) and the version bump rolling into the ASG. Not part of this plan, and an untested image would confound the idle measurement, since both measured runs used the old one. Fix: the launch template now has `ignore_changes = [image_id]` (comment in `compute.tf` says how to refresh deliberately). Re-plan expected: 9 to add, 1 to change (`track_jobs`), 0 to destroy.
