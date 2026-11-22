@@ -162,7 +162,7 @@ The plan was to add `g6.2xlarge` after trial 1 for Spot capacity diversity. The 
 
 ## Trial 1 closed (2026-11-22)
 
-The owner applied the Terraform change for the start-image size check (2 added, 6 changed, 1 destroyed; plan text in `docs/terraform_plans/2026-11-22_min_side_plan.txt`) and put the limits back to 0 (service autoscaling max 0, ASG min, max and desired 0). `describe-instances` for pending and running instances returned nothing: no GPU is running. **Seen on the real site by the owner (2026-11-22): the size check works.** Open from this plan: the RAM margin (peak 28.1 GiB of 29, see "Trial 1 result"), and a g6 test only if g5 capacity ever runs short.
+The owner applied the Terraform change for the start-image size check (2 added, 6 changed, 1 destroyed; plan text in `docs/terraform_plans/2026-11-22_min_side_plan.txt`) and put the limits back to 0 (service autoscaling max 0, ASG min, max and desired 0). `describe-instances` for pending and running instances returned nothing: no GPU is running. **Seen on the real site by the owner (2026-11-22): the size check works.** Open from this plan: a g6 test only if g5 capacity ever runs short.
 
 ## RAM margin (G17): what I found without a GPU (2026-11-22)
 
@@ -187,3 +187,5 @@ Two jobs in one process, both `fast` 5 s (121 frames): text, then image to video
 - **Watch item:** anonymous memory after a job's denoise grew from 13.3 (job 1, text) to 15.5 GiB (job 2, image to video). Image jobs hold more (start image, latents, frames), so this is probably the job type, not a leak, but two jobs cannot tell them apart. A run of three or more jobs would; not worth a GPU run alone. The `memory after ...` lines stay in the log, so any later run shows it.
 - **New measurement:** image to video at 5 s `fast` is 22.3 s per step, the same as text at 5 s (the earlier 3 s image-to-video was 11.6 s per step).
 - Cost of the run (my estimate): about 40 min of g5 (cold start, two jobs of about 12.5 min, idle wait), about $0.5.
+
+After the G17 run the owner put the limits back to 0; the worker stopped 3.0 min after the last upload and `describe-instances` for pending and running returned nothing: no GPU is running. **G17 closed.**
