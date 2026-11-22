@@ -130,3 +130,21 @@ Attempt 1 on the old image failed at the decode (413.5 GPU s); attempt 2 was at 
 **Trial 1 cost so far:** about 1 h 45 min of g5 over three runs, about $1.3 to $1.5 (my estimate), one clip.
 
 **Still to do in trial 1:** (c) image to video on a real GPU with a real upload from the site (first real use of `POST /uploads` on real S3); (b) a 5 s clip (the longest case: 121 frames, about 27k tokens, my estimate about 2x the time per step and a higher GPU peak, unmeasured); a second job in the same process (the case that got the container OOM-killed before the encoder change).
+
+## Trial 1 result (2026-11-22, g5.2xlarge Spot, fourth run): accepted
+
+Two jobs in one worker process, both `fast`: a 5 s text clip, then a 3 s image-to-video clip from a real photo uploaded on the site (the first real `POST /uploads` on real S3; it worked). Both succeeded on attempt 1, so the case that got the container OOM-killed before the per-job prompt encoder (a second job in the same process) is fixed.
+
+| | 5 s text (121 frames) | 3 s image to video (73 frames) |
+|---|---|---|
+| seconds per step | 22.3 | 11.6 |
+| GPU seconds (`gpu_seconds` in the log) | 763.7 | 389.6 |
+| peak GPU memory | 14.6 GiB | 13.9 GiB |
+| peak RAM | 28.1 GiB | 28.1 GiB |
+
+- **Time per clip:** 5 s costs about 2x a 3 s clip, as estimated. At `high` (50 steps) a 5 s clip is about 18.6 min of GPU, about $0.25 of Spot compute (my estimate at about $0.8 an hour).
+- **RAM is the tightest limit.** Peak 27.1 GiB right after loading the model (it was 24.2 GiB in the earlier run; not explained) and 28.1 GiB after the first job, against the 29 GiB container limit. It passed with about 1 GiB to spare; `g6.2xlarge` has the same 32 GiB. Open: find out what makes the load peak, and lower it before adding load.
+- **Plan 07 held again:** the worker stopped 5.7 min after the last upload.
+- **Image to video:** the person, hard hat, logo and background stayed the same from the first frame to the last, and the start image's idea followed the prompt. In the six frames I checked, the object that enters the scene changed colour partway; the 512 px minimum and the 16:9 centre crop mean a square photo loses about 45% of its height (the top and bottom), which can clip a chin or a hat. A user-facing note on the crop is worth adding to the upload form.
+- **Cost of this run:** about $0.45 (my estimate). Trial 1 in total: about $1.8 to $2 over four runs (my estimate); the Billing console has the real number.
+- **Owner's verdict:** the clips are okay. Decision: the 1.3B weights are deleted from S3 by the owner; `g6.2xlarge` is added next, with one confirmation run.
