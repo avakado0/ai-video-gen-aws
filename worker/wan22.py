@@ -30,6 +30,7 @@ import gc
 import logging
 import pathlib
 
+from . import memory
 from .errors import Aborted, PermanentJobError
 from .generator import Generator
 from .wan import DEFAULT_NEGATIVE_PROMPT, LOG_EVERY_STEPS, pick_seed
@@ -141,6 +142,7 @@ class Wan22Generator(Generator):
         self.pipe, self.image_pipe, self._offloaded = pipe, image_pipe, pipe
         # The instance has no SSH, so the log is the only way to see whether the weights fit in RAM.
         log.info("model loaded, peak RAM so far %.1f GiB", _peak_ram_gib())
+        log.info("%s", memory.report("after load"))
 
     def generate(self, job, inputs, should_abort, out_dir):
         error = None
@@ -224,6 +226,7 @@ class Wan22Generator(Generator):
         negative_prompt = job.params.get("negative_prompt") or self.default_negative_prompt or DEFAULT_NEGATIVE_PROMPT
         # The pipelines use the negative prompt only when guidance_scale is above 1.
         prompt_embeds, negative_prompt_embeds = self._encode_prompt(job.prompt, negative_prompt, guidance > 1.0)
+        log.info("%s", memory.report("after prompt encode"))
 
         kwargs = dict(
             prompt_embeds=prompt_embeds,
@@ -241,6 +244,7 @@ class Wan22Generator(Generator):
         frames = pipe(**kwargs).frames[0]
         log.info("peak memory: GPU %.1f GiB, RAM %.1f GiB",
                  torch.cuda.max_memory_allocated() / 2**30, _peak_ram_gib())
+        log.info("%s", memory.report("after denoise"))
         out = pathlib.Path(out_dir) / "clip.mp4"
         export_to_video(frames, str(out), fps=FPS)
         return out

@@ -563,6 +563,23 @@ def test_load_logs_how_much_ram_the_loaded_model_takes(monkeypatch, tmp_path, ca
                for r in caplog.records)
 
 
+def test_load_logs_the_memory_report_splitting_anonymous_and_file_pages(monkeypatch, tmp_path, caplog):
+    # G17: ru_maxrss counts memory-mapped weight files, which the kernel can reclaim. The report says
+    # which part of a peak is real.
+    caplog.set_level(logging.INFO)
+    _load(monkeypatch, tmp_path)
+    assert any(r.getMessage().startswith("memory after load:") for r in caplog.records)
+
+
+def test_a_job_logs_the_memory_report_after_the_prompt_encode_and_after_denoising(monkeypatch, tmp_path, caplog):
+    caplog.set_level(logging.INFO)
+    gen, log = _gen(monkeypatch, tmp_path)
+    gen.generate(_job(prompt="a very private cat"), {}, lambda: False, tmp_path)
+    lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("memory after")]
+    assert [l.split(":")[0] for l in lines] == ["memory after prompt encode", "memory after denoise"]
+    assert not any("private" in l for l in lines)
+
+
 def test_load_does_not_load_the_text_encoder_at_all(monkeypatch, tmp_path):
     # 11.4 GB of host RAM that nothing needs while denoising. Passing None makes diffusers skip it.
     gen, seen = _load(monkeypatch, tmp_path)
