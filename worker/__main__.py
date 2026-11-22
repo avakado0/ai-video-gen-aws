@@ -14,6 +14,23 @@ from .protection import protection_from_env
 from .runner import Worker
 from .store import ClipStore
 from .wan import WanGenerator
+from .wan22 import Wan22Generator
+
+
+# The manifest's `model` name decides which generator runs (one model per deployment, plan 06).
+# `wan.py` is the parked Wan 2.1 1.3B path: kept, tested, and one manifest file away.
+GENERATORS = {
+    "wan2-2-ti2v-5b": Wan22Generator,
+    "wan2-1-t2v-1-3b": WanGenerator,
+}
+
+
+def make_generator(models_dir, model_name):
+    try:
+        generator_class = GENERATORS[model_name]
+    except KeyError:
+        raise SystemExit(f"no generator for model {model_name!r}; this worker knows: {', '.join(sorted(GENERATORS))}")
+    return generator_class(models_dir, model_name)
 
 
 def main():
@@ -28,7 +45,7 @@ def main():
     signal.signal(signal.SIGINT, lambda *_: stopping.set())
 
     imds = Imds()
-    generator = WanGenerator(config.models_dir, config.manifest["model"])
+    generator = make_generator(config.models_dir, config.manifest["model"])
     log.info("loading model from %s", generator.path)
     generator.load()
 
