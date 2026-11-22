@@ -93,10 +93,10 @@ resource "aws_autoscaling_group" "gpu" {
         version            = aws_launch_template.gpu.latest_version
       }
 
-      # Both have 8 vCPU and 32 GB RAM, which the model needs.
-      override {
-        instance_type = "g4dn.2xlarge"
-      }
+      # Wan 2.2 5B needs a 24 GB GPU (plan 06), so the 16 GB T4 of the g4dn.2xlarge is out. The
+      # g5.2xlarge has an A10G (24 GB), 8 vCPU and 32 GB RAM. The g6.2xlarge (L4, 24 GB, same
+      # vCPU and RAM) joins in a second change, after trial 1 has shown the model works here.
+      # One type means no Spot diversity: if g5 capacity is short, jobs wait.
       override {
         instance_type = "g5.2xlarge"
       }
