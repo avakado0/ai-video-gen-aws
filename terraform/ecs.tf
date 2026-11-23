@@ -61,6 +61,9 @@ resource "aws_ecs_task_definition" "worker" {
         # One source of truth for the model's inputs and params (spec 3B); the worker re-checks
         # every job against it. Re-encoded to one line, same as the API Lambda gets it.
         { name = "MODEL_MANIFEST", value = jsonencode(jsondecode(file("${path.module}/../model_manifest.json"))) },
+        # Per-job cost estimate (plan 08): the worker prices an attempt from the Spot price history and
+        # falls back to this table (USD per hour by instance type) if that call fails.
+        { name = "SPOT_PRICE_FALLBACK", value = jsonencode(var.spot_price_fallback) },
       ]
 
       logConfiguration = {

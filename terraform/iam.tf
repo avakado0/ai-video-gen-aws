@@ -142,6 +142,13 @@ data "aws_iam_policy_document" "task" {
     actions   = ["s3:GetObject", "s3:DeleteObject"]
     resources = ["${aws_s3_bucket.clips.arn}/inputs/*"]
   }
+  # Cost estimate per job (plan 08): the worker reads the Spot price history of its own instance
+  # type. Read-only and free. The action does not support resource-level permissions.
+  statement {
+    sid       = "ReadSpotPriceHistory"
+    actions   = ["ec2:DescribeSpotPriceHistory"]
+    resources = ["*"]
+  }
   statement {
     sid       = "ProtectOwnTaskFromScaleIn"
     actions   = ["ecs:UpdateTaskProtection"]

@@ -21,6 +21,17 @@ variable "models_bucket_name" {
   type        = string
 }
 
+variable "spot_price_fallback" {
+  description = "USD per hour by instance type, used for the per-job cost estimate only when the Spot price history cannot be read (plan 08). The default leans high: the top of the g5.2xlarge range seen in us-west-2 on 2026-11-22 ($0.69 to $0.90)."
+  type        = map(number)
+  default     = { "g5.2xlarge" = 0.90 }
+
+  validation {
+    condition     = alltrue([for price in values(var.spot_price_fallback) : price > 0])
+    error_message = "Every fallback price must be above 0."
+  }
+}
+
 variable "gpu_max" {
   description = "Initial ASG Max Size, the GPU cost ceiling. Leave at 0. The ASG ignores later changes to max_size (ADR 0004), so raise the live limit by CLI or console, not by editing this."
   type        = number
