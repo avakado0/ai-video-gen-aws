@@ -17,6 +17,9 @@ select option { color: var(--fg); background: var(--bg); }
 .field { display: block; margin-bottom: 1rem; }
 .field > span { display: block; font-weight: 600; text-transform: capitalize; }
 .field small { display: block; color: var(--muted); }
+.prompt-tips-box { margin: -.5rem 0 1rem; font-size: .85rem; }
+.prompt-tips-toggle { color: var(--muted); cursor: pointer; }
+.prompt-tips { margin: .3rem 0 0; padding-left: 1.2rem; color: var(--muted); }
 textarea, input[type=text], input[type=number], select, input[type=file] { width: 100%; padding: .5rem; font: inherit; color: inherit; background: transparent; border: 1px solid var(--line); border-radius: 6px; }
 input[type=checkbox] { width: 1.1rem; height: 1.1rem; }
 .advanced { margin-bottom: 1rem; }

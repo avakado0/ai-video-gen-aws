@@ -1,6 +1,6 @@
 /**
  * @typedef {{name: string, label: string, kind: 'image'|'audio'|'video', required: boolean, max_files?: number, mime: string[], max_bytes: number, max_seconds?: number, min_side?: number}} InputSlot
- * @typedef {{model: string, prompt?: 'required'|'optional'|'none', inputs: InputSlot[], limits: {prompt_max_chars: number}, params: object[]}} Manifest
+ * @typedef {{model: string, prompt?: 'required'|'optional'|'none', inputs: InputSlot[], limits: {prompt_max_chars: number}, prompt_hint?: string[], params: object[]}} Manifest
  * @typedef {{id: string, status: 'pending'|'ready'|'failed', prompt?: string, created?: string,
  *            url?: string, reason?: {code: string, field?: string, message: string}}} Job
  */

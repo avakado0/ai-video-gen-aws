@@ -1,5 +1,6 @@
 /** Renders the job form from a capability manifest. Knows nothing about specific models. */
 import { minSideHint, shortSideProblem } from './imagesize.js';
+import { hasHint, setTipsShown, tipsShown } from './prompthint.js';
 
 const el = (tag, attrs = {}, ...kids) => {
   const node = Object.assign(document.createElement(tag), attrs);
@@ -50,6 +51,20 @@ export class ManifestForm {
       control, ...(hint ? [el('small', { textContent: hint })] : []), err);
   }
 
+  /** The manifest's prompt tips, with a remembered "Show prompt tips" switch. */
+  #promptTips() {
+    const store = globalThis.localStorage;
+    const list = el('ul', { className: 'prompt-tips', hidden: !tipsShown(store) });
+    for (const tip of this.manifest.prompt_hint) list.append(el('li', { textContent: tip }));
+    const box = el('input', { type: 'checkbox', checked: tipsShown(store) });
+    box.addEventListener('change', () => {
+      list.hidden = !box.checked;
+      setTipsShown(store, box.checked);
+    });
+    return el('div', { className: 'prompt-tips-box' },
+      el('label', { className: 'prompt-tips-toggle' }, box, ' Show prompt tips'), list);
+  }
+
   #render() {
     const { inputs, limits, params } = this.manifest;
     this.root.replaceChildren();
@@ -60,6 +75,7 @@ export class ManifestForm {
     if (mode !== 'none') {
       this.root.append(this.#field('prompt', 'Prompt', this.fields.prompt,
         `${mode === 'optional' ? 'Optional, up' : 'Up'} to ${max} characters`));
+      if (hasHint(this.manifest)) this.root.append(this.#promptTips());
     } else {
       this.errors.prompt = el('div', { className: 'error', hidden: true }); // submit errors still need a home
       this.root.append(this.errors.prompt);
