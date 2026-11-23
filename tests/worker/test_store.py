@@ -69,3 +69,11 @@ def test_delete_inputs_removes_only_this_jobs_inputs(aws, store):
     put(aws, f"clips/{SUB}/{JOB_ID}.pending")
     store.delete_inputs(SUB, JOB_ID)
     assert keys(aws) == [f"clips/{SUB}/{JOB_ID}.pending", f"inputs/{SUB}/other-job/image/0"]
+
+
+def test_put_attempt_writes_one_record_per_attempt_number(aws, store):
+    store.put_attempt(SUB, JOB_ID, 2, {"gpu_seconds": 12.5, "cost_usd": 0.003, "outcome": "released"})
+    store.put_attempt(SUB, JOB_ID, 3, {"gpu_seconds": 90.0, "cost_usd": None, "outcome": "ok"})
+    assert keys(aws) == [f"clips/{SUB}/{JOB_ID}.attempt-2.json", f"clips/{SUB}/{JOB_ID}.attempt-3.json"]
+    body = aws.s3.get_object(Bucket=aws.bucket, Key=f"clips/{SUB}/{JOB_ID}.attempt-2.json")["Body"].read()
+    assert json.loads(body) == {"gpu_seconds": 12.5, "cost_usd": 0.003, "outcome": "released"}

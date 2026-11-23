@@ -32,6 +32,12 @@ class ClipStore:
         self.s3.put_object(Bucket=self.bucket, Key=self._clip_key(sub, job_id, "failed"),
                            Body=json.dumps(error).encode(), ContentType="application/json")
 
+    def put_attempt(self, sub, job_id, attempt, record):
+        """One write-only usage record per attempt (plan 08). Never rewritten, so two workers cannot
+        race, and it is not a state marker, so it cannot bring a cancelled job back."""
+        self.s3.put_object(Bucket=self.bucket, Key=self._clip_key(sub, job_id, f"attempt-{attempt}.json"),
+                           Body=json.dumps(record).encode(), ContentType="application/json")
+
     def upload_clip(self, sub, job_id, path):
         # put_object, not upload_file: no multipart, so the task role needs only s3:PutObject
         with open(path, "rb") as f:
