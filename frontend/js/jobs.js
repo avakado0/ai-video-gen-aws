@@ -1,4 +1,5 @@
 /** Job list: renders GET /jobs and polls pending jobs until they settle. */
+import { costNote } from './cost.js';
 import { pendingNote } from './elapsed.js';
 
 export class JobList {
@@ -74,6 +75,9 @@ export class JobList {
       if (r.field) why.textContent = `${r.field}: ${why.textContent}`;
       li.append(why);
     }
+    // What the job cost (an estimate, GPU time only) and how many tries it took: settled jobs only.
+    const cost = costNote(job);
+    if (cost) li.append(Object.assign(document.createElement('p'), { className: 'muted job-cost', textContent: cost }));
     // A pending job can be cancelled: the same DELETE removes its marker, and the worker skips
     // a job whose marker is gone. Ready and failed jobs are removed the same way.
     const del = Object.assign(document.createElement('button'), {

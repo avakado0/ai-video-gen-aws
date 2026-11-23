@@ -91,21 +91,31 @@ export class MockApiClient extends ApiClient {
     return id;
   }
 
+  /** Mock cost, like the real API: failed jobs and ready clips carry it. Prompt "retry" took 3 tries,
+   *  "noprice" has a try count but no known price. */
+  #usage(job) {
+    const prompt = job.prompt.trim().toLowerCase();
+    if (prompt === 'retry') return { cost_usd: 0.1386, attempts: 3 };
+    if (prompt === 'noprice') return { cost_usd: null, attempts: 2 };
+    if (prompt === 'fail') return { cost_usd: 0.0031, attempts: 1 };
+    return { cost_usd: 0.0412, attempts: 1 };
+  }
+
   #view(job) {
     const done = Date.now() - job.submittedAt >= PENDING_MS;
     const base = { id: job.id, prompt: job.prompt, created: job.created };
     if (!done) return { ...base, status: 'pending' };
     if (job.prompt.trim().toLowerCase() === 'fail') {
-      return { ...base, status: 'failed', reason: { code: 'invalid_input', field: 'prompt', message: 'Mock failure requested.' } };
+      return { ...base, status: 'failed', reason: { code: 'invalid_input', field: 'prompt', message: 'Mock failure requested.' }, ...this.#usage(job) };
     }
-    return { ...base, status: 'ready', url: SAMPLE_CLIP };
+    return { ...base, status: 'ready', url: SAMPLE_CLIP, ...this.#usage(job) };
   }
 
   async listJobs() {
     await sleep(100);
     return Object.values(this.jobs)
       .sort((a, b) => b.submittedAt - a.submittedAt)
-      .map((j) => { const { url, ...rest } = this.#view(j); return rest; }); // list carries no URLs
+      .map((j) => { const { url, cost_usd, attempts, ...rest } = this.#view(j); return rest; }); // the list carries no URLs and no cost, like GET /jobs
   }
 
   async getJob(id) {
