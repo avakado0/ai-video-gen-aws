@@ -4,6 +4,12 @@
   "limits": {
     "prompt_max_chars": 500
   },
+  "prompt_hint": [
+    "Order: style, subject, motion, scene, then camera and light (shot size, angle, soft or hard light).",
+    "Text to video: about 60-200 characters. With a start image: under 100, and describe only motion and camera.",
+    "Do not repeat what the start image already shows. Write 'fixed shot' for a still camera.",
+    "One shot per clip, no sound or speech. Put unwanted things in Negative prompt, not the prompt."
+  ],
   "inputs": [
     {
       "name": "image",

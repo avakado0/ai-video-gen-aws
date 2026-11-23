@@ -111,6 +111,22 @@ def _param_errors(i, p, seen):
     return errors
 
 
+PROMPT_HINT_MAX_CHARS = 600  # the manifest rides in a Lambda env var (4 KB for all of them together)
+
+
+def _hint_errors(data):
+    hint = data.get("prompt_hint")
+    if hint is None:
+        return []
+    if not isinstance(hint, list) or not hint or not all(isinstance(t, str) and t.strip() for t in hint):
+        return ["prompt_hint must be a non-empty list of non-empty strings"]
+    if data.get("prompt", "required") == "none":
+        return ["prompt_hint needs a prompt field (prompt is none)"]
+    if sum(len(t) for t in hint) > PROMPT_HINT_MAX_CHARS:
+        return [f"prompt_hint must be at most {PROMPT_HINT_MAX_CHARS} characters in total"]
+    return []
+
+
 def validate(data):
     """Return a list of problems with a manifest dict; empty means valid."""
     if not isinstance(data, dict):
@@ -122,6 +138,7 @@ def validate(data):
     limit = limits.get("prompt_max_chars") if isinstance(limits, dict) else None
     if not _is_int(limit) or limit < 1:
         errors.append("limits.prompt_max_chars must be a positive integer")
+    errors += _hint_errors(data)
     inputs = data.get("inputs")
     if not isinstance(inputs, list):
         errors.append("inputs must be a list (empty for text-only models)")

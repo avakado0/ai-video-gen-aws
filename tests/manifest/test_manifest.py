@@ -97,6 +97,36 @@ def test_prompt_limit_must_be_a_positive_int():
     bad(with_(limits={}), "prompt_max_chars")
 
 
+def test_prompt_hint_is_optional():
+    m = load_v1()
+    m.pop("prompt_hint", None)
+    assert manifest.validate(m) == []
+
+
+def test_good_prompt_hint_is_valid():
+    assert manifest.validate(with_(prompt_hint=["Put the style first.", "Say 'fixed shot' for a still camera."])) == []
+
+
+@pytest.mark.parametrize("hint", ["a string", {"a": 1}, [], [""], ["ok", 3], ["  "]])
+def test_prompt_hint_must_be_a_non_empty_list_of_non_empty_strings(hint):
+    bad(with_(prompt_hint=hint), "prompt_hint")
+
+
+def test_prompt_hint_total_length_is_capped_for_the_lambda_env_var():
+    bad(with_(prompt_hint=["x" * 300, "y" * 301]), "prompt_hint")
+    assert manifest.validate(with_(prompt_hint=["x" * 300, "y" * 300])) == []
+
+
+def test_prompt_hint_makes_no_sense_without_a_prompt_field():
+    bad(with_(prompt="none", prompt_hint=["tip"]), "prompt_hint")
+
+
+def test_the_live_manifest_has_a_prompt_hint_that_leaves_room_in_the_lambda_env():
+    m = load_v1()
+    assert m["prompt_hint"]
+    assert len(json.dumps(m, separators=(",", ":"))) < 2500  # Lambda env vars share 4 KB with the rest
+
+
 def test_inputs_must_be_a_list():
     bad(with_(inputs={}), "inputs")
 
