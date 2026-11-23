@@ -55,3 +55,11 @@ class Imds:
         except Exception as e:
             log.warning("instance type lookup failed: %s", e)
             return "unknown"
+
+    def availability_zone(self):
+        """The zone this instance runs in (Spot prices differ per zone), or None when unknown."""
+        try:
+            return self._get("/latest/meta-data/placement/availability-zone").strip()
+        except Exception as e:
+            log.warning("availability zone lookup failed: %s", e)
+            return None

@@ -3,6 +3,7 @@ from worker.imds import Imds
 TOKEN = ("PUT", "/latest/api/token")
 ACTION = ("GET", "/latest/meta-data/spot/instance-action")
 TYPE = ("GET", "/latest/meta-data/instance-type")
+ZONE = ("GET", "/latest/meta-data/placement/availability-zone")
 
 
 def test_no_notice_is_404_and_means_false(http):
@@ -47,3 +48,14 @@ def test_instance_type(http):
 
 def test_instance_type_falls_back_to_unknown(http):
     assert Imds(http.url).instance_type() == "unknown"
+
+
+def test_availability_zone(http):
+    http.routes[TOKEN] = (200, "tok")
+    http.routes[ZONE] = (200, "us-west-2b")
+    assert Imds(http.url).availability_zone() == "us-west-2b"
+
+
+def test_availability_zone_falls_back_to_none(http):
+    # None, not "unknown": the price lookup treats it as "no zone filter"
+    assert Imds(http.url).availability_zone() is None
