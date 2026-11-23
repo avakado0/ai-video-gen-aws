@@ -64,7 +64,7 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
   * `POST /uploads`: body names one manifest input slot and the file's position in it (`slot`, `index`, plus MIME type and size). The API checks it against that slot's definition and returns a **pre-signed POST** (not PUT, so the policy can carry `content-length-range` and `Content-Type` conditions) for `inputs/{sub}/{job_id}/{slot}/{index}`. The first upload of a job also mints the `job_id`, which the client reuses for later uploads and for `POST /jobs`. The browser uploads straight to S3.
   * `POST /jobs`: body carries `job_id`, `prompt`, optional `params`, and how many files were uploaded per slot (`{slot: count}`). The API validates everything against the manifest (prompt present when required, every required slot present, no unknown slots, file counts within `max_files`, param values clamped to their ranges), HEADs each input under `inputs/{sub}/{job_id}/` (which also yields its size), writes the `clips/{sub}/{job_id}.pending` marker, then sends the request to SQS (includes the caller's `sub`). It rejects the request with 429 if the caller already has 3 active jobs (`.pending` markers without a `.mp4` or `.failed`). The cap is soft: concurrent requests can overshoot it by one; no lock or counter. It logs the input `bytes` for cost attribution (3H). The queue message is sent with a 30-second delay (`SUBMIT_DELAY_SECONDS`, the undo window, decided 2026-11-18): no worker can see it yet, so a Cancel inside the window costs nothing. A cancelled job's message still turns visible later and can wake an instance to discard it (the worker finds no marker); the cost is one short boot, accepted. Success is 201 `{job_id}`. A `job_id` that already has any marker is 409. If the SQS send fails the marker is removed again and the answer is 503, so a failed submit cannot eat the caller's cap.
   * `GET /jobs`: lists `clips/{sub}/` and groups the objects by `job_id`. `.mp4` means `ready`, `.failed` means `failed`, a bare `.pending` means `pending`. Each entry carries the creation time and prompt read from the marker. Because there is no database, this listing is how a reload or another device finds its jobs.
-  * `GET /jobs/{job_id}`: checks `clips/{sub}/{job_id}.mp4`, `.failed` and `.pending` with HEAD. Returns `ready` plus a fresh pre-signed GET URL (6-hour expiry, see 3C), `failed` plus the failure reason (read from the marker), or `pending`. If none exist it returns 404.
+  * `GET /jobs/{job_id}`: checks `clips/{sub}/{job_id}.mp4`, `.failed` and `.pending` with HEAD. Returns `ready` plus a fresh pre-signed GET URL (6-hour expiry, see 3C), `failed` plus the failure reason (read from the marker), or `pending`. If none exist it returns 404. `ready` and `failed` also carry `cost_usd` and `attempts` (plan 08, 3H): the estimated GPU cost of all attempts and how many tries the job took, summed from the per-attempt records. Both are `null` when no record exists, and `cost_usd` is `null` as soon as one price or record is unknown (a partial sum would pass for the real cost). `GET /jobs` does not carry them, so the list needs no extra reads. `DELETE /jobs/{job_id}` also removes the job's attempt records.
   * `DELETE /jobs/{job_id}`: called after the browser confirms the download. Deletes the clip and the `.pending` marker.
   * CORS is enabled on the HTTP API for the CloudFront origin, and on the clips bucket for browser `POST` uploads to `inputs/` (and for downloads if they use `fetch`).
 * **Capability manifest (`model_manifest.json`, repo root of the deployment):** one deployment serves exactly one model, so one manifest describes it. Terraform reads the file and passes it as an environment variable to the API Lambda and the ECS task, so there is a single source of truth and no extra IAM. Contents:
@@ -88,6 +88,7 @@ Other AWS API traffic (ECS agent, ECR API, SQS, CloudWatch Logs) leaves the inst
     * `clips/{sub}/{job_id}.mp4`: the generated clip.
     * `clips/{sub}/{job_id}.pending`: small JSON marker written by `POST /jobs` (creation time, prompt, params). It is what makes an in-progress job visible to `GET /jobs`.
     * `clips/{sub}/{job_id}.failed`: JSON marker for failed jobs: `{"code", "field"?, "message"}`. The worker writes `invalid_input` (with the offending `field`) for permanent input errors. The DLQ Lambda writes `{"code": "internal"}`. The message is sanitised, because the UI shows it to the user.
+    * `clips/{sub}/{job_id}.attempt-{n}.json`: one usage record per worker attempt (`n` is the receive count), `{"gpu_seconds", "cost_usd", "outcome", "instance_type"}`, written by the worker (plan 08, 3H). Write-only for the worker, never rewritten, not a state marker (a cancel cannot be undone by it). The listing in `GET /jobs` ignores it. The API reads and deletes it.
     * `inputs/{sub}/{job_id}/{slot}/{index}`: the user's uploaded inputs, one object per file (a slot can hold several) (3B).
   * Lifecycle (`aws_s3_bucket_lifecycle_configuration`): **expire after 1 day** (the S3 minimum) on both the `clips/` and `inputs/` prefixes. Cheaper storage classes need 30+ days, so there is no transition rule. S3 runs lifecycle rules asynchronously, so removal can lag by up to a day. This is a backstop: the clip is normally deleted by the API as soon as the user's download is confirmed, and inputs are deleted by the worker after a successful job (section 4). Orphaned uploads, failed jobs and dead-lettered jobs are cleaned by the rule. A job still queued after a day finds its inputs expired and fails with `invalid_input` ("input expired").
   * CORS: the bucket allows browser `POST` from the CloudFront origin, for the pre-signed upload.
@@ -146,7 +147,7 @@ SQS depth ─► CloudWatch alarm / metric math ─► ECS Service Auto Scaling 
 ### G. IAM (`terraform/iam.tf`)
 
 * **EC2 instance profile:** ECS agent permissions (AWS managed `AmazonEC2ContainerServiceforEC2Role`), plus `s3:GetObject` on `models/*` and `s3:ListBucket` on the models bucket limited to the prefix `models/*` (for the `user_data` copy, which must therefore list with a `models/` prefix).
-* **ECS task role (worker):** `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` on the queue; `s3:PutObject` on `clips/*` in the clips bucket; `s3:GetObject` and `s3:DeleteObject` on `inputs/*`; `s3:GetObject` on `clips/*.pending` and `s3:ListBucket` on the clips bucket (stale-job check, section 4); `ecs:UpdateTaskProtection`.
+* **ECS task role (worker):** `sqs:ReceiveMessage`, `sqs:DeleteMessage`, `sqs:ChangeMessageVisibility` on the queue; `s3:PutObject` on `clips/*` in the clips bucket; `s3:GetObject` and `s3:DeleteObject` on `inputs/*`; `s3:GetObject` on `clips/*.pending` and `s3:ListBucket` on the clips bucket (stale-job check, section 4); `ec2:DescribeSpotPriceHistory` (read-only, no resource-level permissions, for the cost estimate in 3H); `ecs:UpdateTaskProtection`.
 * **ECS task execution role:** pull from ECR, write CloudWatch Logs.
 * **API Lambda role:** `sqs:SendMessage`; on the clips bucket `s3:GetObject`, `s3:PutObject` (the `.pending` marker and the pre-signed upload POST), `s3:DeleteObject`, and **`s3:ListBucket`**. Without `ListBucket`, a HEAD on a missing key returns 403 instead of 404, and "pending" would look like an error.
 * **Failure-marker Lambda role:** `sqs:ReceiveMessage`/`DeleteMessage`/`GetQueueAttributes` on the DLQ (the event source mapping needs `GetQueueAttributes`); `s3:PutObject` on `clips/*`.
@@ -167,8 +168,14 @@ All users share the same instances, queue, Lambdas and buckets, so the AWS bill 
   * `attempt` is the message's `ApproximateReceiveCount` (request it with `MessageSystemAttributeNames=["ApproximateReceiveCount"]`).
   * `instance_type` comes from IMDS (`meta-data/instance-type`), because g4dn and g5 are priced differently.
   * `gpu_seconds` is wall-clock time from receive to delete or release.
+  * `cost_usd` (plan 08) is the attempt's estimated cost, or `null`. See "Per-job cost estimate" below.
   * `outcome` is one of `ok`, `failed`, `released` (Spot or SIGTERM), `cancelled` (the user cancelled mid-run), `stale` (the marker was already gone), `error` (unexpected, handed back for retry), `gave_up` (unexpected error on the third receive or later: marker written, message deleted). Work lost to a Spot release still counts toward the user whose job it was.
   * A worker killed without warning writes no line; that time falls into overhead.
+* **Per-job cost estimate (plan 08, decided 2026-11-23):** the UI shows "~$0.07 · 2 tries · GPU only" under a ready or failed job. It is an estimate, not the bill.
+  * **What it counts:** GPU instance time only, over every attempt of the job (a released or failed attempt burned real time). No share of cold boot, weight copy or idle (unknown when the clip is ready, and the first job after a wake-up would carry most of it), and no egress (the clip is deleted after the download). The monthly allocation above stays the way to put the whole bill on users.
+  * **Price:** `cost = seconds x average Spot price`, the price from `ec2:DescribeSpotPriceHistory` for the instance type and zone (IMDS `placement/availability-zone`), weighted by how long each price held during the attempt (`worker/pricing.py`). If the call fails or returns nothing, a per-type table is used (Terraform variable `spot_price_fallback`, env var `SPOT_PRICE_FALLBACK`, default `g5.2xlarge` $0.90, the top of the range seen on 2026-11-22). With neither, the cost is `null`. Pricing never changes the outcome of a job.
+  * **Record:** in the `finally` block the worker writes `clips/{sub}/{job_id}.attempt-{n}.json` (3C) for the outcomes `ok`, `failed`, `released`, `error` and `gave_up`. Not for `stale` (no GPU used), `cancelled` (nobody will look at the job again) or `bad_message`. A failed write is logged and ignored. Why a separate record and not the `.pending` marker: a write there could bring a cancelled job back.
+  * **Known gaps:** an instance killed with no warning writes no record, so that attempt's time is missing from the sum (the try count still includes it, because the API takes the highest attempt number seen). No heartbeat write was added. The price is the market price in the zone, not necessarily what the instance paid.
 * **API usage log:** on `DELETE /jobs/{job_id}` (download confirmed), the API HEADs the clip before deleting it and logs:
   `{"event": "download", "sub", "job_id", "bytes"}`
   This approximates egress. Repeat downloads (e.g., after a 403 re-request) and abandoned downloads are not counted. `POST /jobs` likewise logs `{"event": "inputs", "sub", "job_id", "bytes"}` from the HEAD results on the uploaded inputs.
@@ -280,14 +287,18 @@ def poll_queue():
             sqs.change_message_visibility(QueueUrl=QUEUE_URL, ReceiptHandle=handle, VisibilityTimeout=0)
         finally:
             unprotect_task()
+            gpu_seconds = round(time.monotonic() - started, 1)
+            cost = attempt_cost(instance_type(), started_at, now())   # section 3H, may be None
             # Per-user cost attribution (section 3H): one JSON line per attempt
             log_usage(
                 sub=job["sub"], job_id=job["job_id"],
                 attempt=int(msg["Attributes"]["ApproximateReceiveCount"]),
                 instance_type=instance_type(),  # IMDS meta-data/instance-type
-                gpu_seconds=round(time.monotonic() - started, 1),
+                gpu_seconds=gpu_seconds, cost_usd=cost,
                 outcome=outcome,
             )
+            # Per-job cost shown in the UI (3H): one write-only record per attempt, best effort
+            put_attempt_record(job, outcome, gpu_seconds, cost)
 ```
 
 ---

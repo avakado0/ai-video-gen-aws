@@ -14,3 +14,6 @@ Domain language for the AI video generation pipeline.
 - **Job marker**: a small S3 object that records job state. `.pending` (submitted, JSON), `.failed` (permanent failure, JSON reason). A job with a `.mp4` is ready.
 - **Model shape**: the combination of input slots a model takes (text only, text+image, first/last frame, video+text, video+audio, avatar image+audio). Not a separate code path; it is just a manifest.
 - **Release**: a worker returning a job to the queue because of a Spot interruption. Not a failure.
+- **Attempt**: one worker receive of a job's queue message. A job can take several (Spot releases, retries). Counted by the queue's receive count.
+- **Attempt record**: `clips/{sub}/{job_id}.attempt-{n}.json`, written by the worker after each attempt that used the GPU. Not a job marker: it holds no job state. The API sums them.
+- **Job cost**: the estimate shown in the UI: GPU time of all attempts at the Spot price, nothing else. Not the AWS bill and not the monthly per-user allocation.
