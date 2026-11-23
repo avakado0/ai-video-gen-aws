@@ -6,6 +6,7 @@ Domain language for the AI video generation pipeline.
 
 - **Deployment**: one running copy of the system. Serves exactly one model.
 - **Capability manifest**: `model_manifest.json`. Declares the deployment model's input slots, prompt limit and tunable params. The front end, API and worker all read it.
+- **Prompt hint**: optional short tips in the manifest (`prompt_hint`), shown under the prompt field. The user can hide them; the choice is kept in the browser.
 - **Job**: one generation request from one user, identified by a UUID `job_id`, owned by a Cognito `sub`.
 - **Input slot**: one named file input declared by the manifest (`kind` image, audio or video; required or optional). A slot holds one file, or several when it declares `max_files` above 1 (e.g. reference images). Examples: `image`, `first_frame`, `source_video`, `audio`.
 - **Input**: the file a user uploads for an input slot. Stored at `inputs/{sub}/{job_id}/{slot}/{index}`. Temporary.
