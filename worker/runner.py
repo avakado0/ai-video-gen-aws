@@ -13,6 +13,7 @@ Outcomes, as written to the usage log:
 import logging
 import shutil
 import time
+from datetime import datetime, timezone
 
 from common.usage import log_usage as default_log_usage
 
@@ -26,16 +27,22 @@ log = logging.getLogger("worker.runner")
 # plan 06 showed a deterministic error running a 7 minute job again and again; the queue's own limit
 # of 8 receives would have meant about an hour of GPU. Spot releases count as receives too.
 GIVE_UP_AFTER_RECEIVES = 3
+# Outcomes that leave a usage record (plan 08). `stale` never used the GPU and `cancelled` belongs to a
+# job nobody will look at again; `bad_message` has no job at all.
+RECORDED = {"ok", "failed", "released", "error", "gave_up"}
 GAVE_UP = PermanentJobError("internal", "The job could not be completed.")   # same text as the DLQ Lambda
 
 
 class Worker:
     def __init__(self, config, queue, store, generator, protection, spot_notice, stopping,
-                 instance_type, work_dir, log_usage=default_log_usage, clock=time.monotonic):
+                 instance_type, work_dir, log_usage=default_log_usage, clock=time.monotonic,
+                 attempt_cost=lambda instance_type, start, end: None,
+                 wall_clock=lambda: datetime.now(timezone.utc)):
         self.config, self.queue, self.store, self.generator = config, queue, store, generator
         self.protection, self.spot_notice, self.stopping = protection, spot_notice, stopping
         self.instance_type, self.work_dir = instance_type, work_dir
         self.log_usage, self.clock = log_usage, clock
+        self.attempt_cost, self.wall_clock = attempt_cost, wall_clock
 
     def run_forever(self):
         while not self.stopping():
@@ -58,6 +65,7 @@ class Worker:
             return "bad_message"
 
         started = self.clock()        # spec 3H: wall-clock from receive to delete or release
+        started_at = self.wall_clock()   # the same moment as a date, to look up the Spot price
         # Ids and settings only, never the prompt or the user's id: CloudWatch is the one window into a job.
         log.info("received job %s (attempt %d, quality %s)", job.job_id, job.receive_count,
                  job.params.get("quality"))
@@ -72,10 +80,33 @@ class Worker:
                 log.exception("job %s failed unexpectedly; handing it back", job.job_id)
                 self._release(message)
         finally:
+            gpu_seconds = round(self.clock() - started, 1)
+            instance_type = self.instance_type()
+            cost = self._cost(instance_type, started_at) if outcome in RECORDED else None
             self.log_usage("job_attempt", sub=job.sub, job_id=job.job_id, attempt=job.receive_count,
-                           instance_type=self.instance_type(), quality=job.params.get("quality"),
-                           gpu_seconds=round(self.clock() - started, 1), outcome=outcome)
+                           instance_type=instance_type, quality=job.params.get("quality"),
+                           gpu_seconds=gpu_seconds, cost_usd=cost, outcome=outcome)
+            if outcome in RECORDED:
+                self._record_attempt(job, outcome, instance_type, gpu_seconds, cost)
         return outcome
+
+    def _cost(self, instance_type, started_at):
+        """Estimated USD for the attempt, or None. Pricing must never change what happens to a job."""
+        try:
+            cost = self.attempt_cost(instance_type, started_at, self.wall_clock())
+            return None if cost is None else round(cost, 6)
+        except Exception:
+            log.exception("could not price the attempt")
+            return None
+
+    def _record_attempt(self, job, outcome, instance_type, gpu_seconds, cost):
+        """The record the API sums into the job's cost and try count. Best effort, like the usage log."""
+        try:
+            self.store.put_attempt(job.sub, job.job_id, job.receive_count, {
+                "gpu_seconds": gpu_seconds, "cost_usd": cost, "outcome": outcome,
+                "instance_type": instance_type})
+        except Exception:
+            log.exception("could not write the usage record for job %s attempt %d", job.job_id, job.receive_count)
 
     # --- one attempt ---------------------------------------------------------------
 

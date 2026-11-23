@@ -6,6 +6,7 @@ the real one, with tiny intervals, so cancel and Spot paths go through the real 
 import json
 import pathlib
 import time
+from datetime import datetime, timedelta, timezone
 
 import pytest
 from botocore.exceptions import ClientError
@@ -71,6 +72,8 @@ class Env:
         self.generator = generator or FakeGenerator()
         self.protection = Protection()
         self.usage = []
+        self.prices = []      # every (instance_type, start, end) the worker asked a price for
+        self.price = 0.25     # what the fake price lookup answers (None = no price known)
         self.spot = []        # truthy = a Spot notice is up
         self.stopping = []    # truthy = SIGTERM arrived
         self.queue = WorkerQueue(aws.sqs, aws.queue_url, wait_seconds=0)
@@ -84,7 +87,12 @@ class Env:
         return Worker(cfg, self.queue, store, self.generator, self.protection,
                       spot_notice=lambda: bool(self.spot), stopping=lambda: bool(self.stopping),
                       instance_type=lambda: "g4dn.2xlarge", work_dir=self.tmp_path,
-                      log_usage=lambda event, **f: self.usage.append({"event": event, **f}))
+                      log_usage=lambda event, **f: self.usage.append({"event": event, **f}),
+                      attempt_cost=self.attempt_cost)
+
+    def attempt_cost(self, instance_type, start, end):
+        self.prices.append((instance_type, start, end))
+        return self.price
 
     def submit(self, marker=True, **overrides):
         msg = {"job_id": JOB_ID, "sub": SUB, "prompt": "a cat", "params": {}, "inputs": {},
@@ -97,8 +105,21 @@ class Env:
     def run_one(self):
         return self.worker.handle(self.queue.receive())
 
-    def keys(self):
+    def all_keys(self):
         return sorted(o["Key"] for o in self.aws.s3.list_objects_v2(Bucket=self.aws.bucket).get("Contents", []))
+
+    def keys(self):
+        """The bucket's keys without the per-attempt usage records (see `records`)."""
+        return [k for k in self.all_keys() if ".attempt-" not in k]
+
+    def records(self):
+        """{attempt number: record} of the usage records written for the job."""
+        out = {}
+        for key in self.all_keys():
+            if key.startswith(f"clips/{SUB}/{JOB_ID}.attempt-"):
+                n = int(key.rsplit("attempt-", 1)[1].removesuffix(".json"))
+                out[n] = json.loads(self.aws.s3.get_object(Bucket=self.aws.bucket, Key=key)["Body"].read())
+        return out
 
     def counts(self):
         a = self.aws.sqs.get_queue_attributes(QueueUrl=self.aws.queue_url, AttributeNames=["All"])["Attributes"]
@@ -447,3 +468,112 @@ def test_the_log_never_carries_the_prompt_or_the_user_id(env, caplog):
     env.run_one()
     text = " ".join(r.getMessage() for r in caplog.records)
     assert "private" not in text and SUB not in text
+
+
+# --- per-attempt usage records and cost (plan 08) -------------------------------------------
+
+def test_success_writes_an_attempt_record_with_the_cost(env):
+    env.submit()
+    env.run_one()
+    (record,) = env.records().values()
+    assert record["outcome"] == "ok" and record["instance_type"] == "g4dn.2xlarge"
+    assert record["cost_usd"] == 0.25 and record["gpu_seconds"] >= 0
+    assert set(env.records()) == {1}
+
+
+def test_the_record_and_the_usage_line_agree(env):
+    env.submit()
+    env.run_one()
+    assert env.records()[1]["gpu_seconds"] == env.usage[0]["gpu_seconds"]
+    assert env.usage[0]["cost_usd"] == 0.25
+
+
+def test_the_price_is_asked_for_the_instance_and_the_attempt_window(env):
+    env.submit()
+    env.run_one()
+    (instance_type, start, end), = env.prices
+    assert instance_type == "g4dn.2xlarge"
+    assert start.tzinfo is not None and start <= end
+    assert end - start < timedelta(minutes=1)
+
+
+def test_a_failed_job_keeps_its_record(env):
+    def script(should_abort, out_dir):
+        raise PermanentJobError("unsupported_prompt", "That prompt cannot be used.")
+
+    env.generator.script = script
+    env.submit()
+    env.run_one()
+    assert env.records()[1]["outcome"] == "failed"
+
+
+def test_a_released_attempt_is_recorded_and_the_retry_adds_the_next_one(env):
+    def spot(should_abort, out_dir):
+        env.spot.append(1)
+        wait_for_abort(should_abort)
+
+    env.generator.script = spot
+    env.submit()
+    assert env.run_one() == "released"
+    env.spot.clear()
+    env.generator.script = lambda should_abort, out_dir: FakeGenerator.write(out_dir)
+    assert env.run_one() == "ok"
+    assert {n: r["outcome"] for n, r in env.records().items()} == {1: "released", 2: "ok"}
+
+
+def test_error_and_gave_up_attempts_are_recorded(env):
+    _always_fails(env)
+    env.submit()
+    for _ in range(3):
+        env.run_one()
+    assert {n: r["outcome"] for n, r in env.records().items()} == {1: "error", 2: "error", 3: "gave_up"}
+
+
+@pytest.mark.parametrize("scenario", ["stale", "cancelled", "bad_message"])
+def test_attempts_that_cost_nothing_or_belong_to_a_dead_job_write_no_record(env, scenario):
+    if scenario == "stale":
+        env.submit(marker=False)
+    elif scenario == "cancelled":
+        def script(should_abort, out_dir):
+            env.aws.s3.delete_object(Bucket=env.aws.bucket, Key=PENDING)
+            wait_for_abort(should_abort)
+        env.generator.script = script
+        env.submit()
+    else:
+        env.aws.sqs.send_message(QueueUrl=env.aws.queue_url, MessageBody="not json")
+    env.run_one()
+    assert env.records() == {} and env.all_keys() == []
+
+
+def test_no_known_price_is_recorded_as_null(env):
+    env.price = None
+    env.submit()
+    env.run_one()
+    assert env.records()[1]["cost_usd"] is None
+
+
+def test_a_price_lookup_that_blows_up_never_changes_the_outcome(env):
+    def boom(*a):
+        raise RuntimeError("pricing down")
+
+    env.worker.attempt_cost = boom
+    env.submit()
+    assert env.run_one() == "ok"
+    assert env.records()[1]["cost_usd"] is None
+
+
+def test_a_record_that_cannot_be_written_never_changes_the_outcome(env):
+    class NoRecords:
+        def __init__(self, real):
+            self.real = real
+
+        def __getattr__(self, name):
+            return getattr(self.real, name)
+
+        def put_attempt(self, *a):
+            raise ClientError({"Error": {"Code": "500", "Message": "S3 down"}}, "PutObject")
+
+    env.worker = env.build(NoRecords(env.store))
+    env.submit()
+    assert env.run_one() == "ok"
+    assert f"clips/{SUB}/{JOB_ID}.mp4" in env.keys() and env.counts() == (0, 0)
