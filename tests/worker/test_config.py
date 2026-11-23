@@ -31,3 +31,15 @@ def test_a_broken_manifest_stops_the_worker_at_start():
 def test_missing_variable_is_an_error():
     with pytest.raises(KeyError):
         Config.from_env({k: v for k, v in ENV.items() if k != "QUEUE_URL"})
+
+
+def test_spot_price_fallback_is_a_json_map_and_optional():
+    assert Config.from_env(ENV).spot_price_fallback == {}
+    cfg = Config.from_env({**ENV, "SPOT_PRICE_FALLBACK": '{"g5.2xlarge": 0.9}'})
+    assert cfg.spot_price_fallback == {"g5.2xlarge": 0.9}
+
+
+def test_a_broken_spot_price_fallback_is_ignored_not_fatal():
+    # Pricing is best effort; a typo in a Terraform variable must not stop the worker.
+    for bad in ("not json", "[1, 2]", '{"g5.2xlarge": "cheap"}', ""):
+        assert Config.from_env({**ENV, "SPOT_PRICE_FALLBACK": bad}).spot_price_fallback == {}

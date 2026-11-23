@@ -10,6 +10,7 @@ import boto3
 from .config import Config
 from .imds import Imds
 from .jobqueue import WorkerQueue
+from .pricing import SpotPrices
 from .protection import protection_from_env
 from .runner import Worker
 from .store import ClipStore
@@ -49,6 +50,8 @@ def main():
     log.info("loading model from %s", generator.path)
     generator.load()
 
+    prices = SpotPrices(boto3.client("ec2"), config.spot_price_fallback)
+
     worker = Worker(
         config,
         WorkerQueue(boto3.client("sqs"), config.queue_url, config.poll_wait_seconds),
@@ -58,6 +61,8 @@ def main():
         spot_notice=imds.spot_notice,
         stopping=stopping.is_set,
         instance_type=imds.instance_type,
+        attempt_cost=lambda instance_type, start, end: prices.cost(
+            instance_type, imds.availability_zone(), start, end),
         work_dir=pathlib.Path(os.environ.get("WORK_DIR", "/data/work")),
     )
     log.info("ready")
