@@ -3,6 +3,7 @@
     clips/{sub}/{job_id}.pending   JSON: created, prompt, params
     clips/{sub}/{job_id}.mp4       the finished clip
     clips/{sub}/{job_id}.failed    JSON: code, field?, message
+    clips/{sub}/{job_id}.attempt-{n}.json   JSON: gpu_seconds, cost_usd, outcome, instance_type (worker, plan 08)
     inputs/{sub}/{job_id}/{slot}/{index}   uploaded input files
 """
 
@@ -64,6 +65,24 @@ class JobStore:
                 if ext in EXTENSIONS:
                     jobs.setdefault(job_id, {})[ext] = obj["LastModified"]
         return jobs
+
+    def list_attempts(self, sub, job_id):
+        """[(n, record)] for the job's per-attempt usage records, oldest first. A record that cannot
+        be read comes back as {}, so the caller can tell it exists."""
+        prefix = f"clips/{sub}/{job_id}.attempt-"
+        found = []
+        for page in self.s3.get_paginator("list_objects_v2").paginate(Bucket=self.bucket, Prefix=prefix):
+            for obj in page.get("Contents", []):
+                number = obj["Key"][len(prefix):].removesuffix(".json")
+                if number.isdigit():
+                    found.append((int(number), obj["Key"]))
+        return [(n, self.read_json(key) or {}) for n, key in sorted(found)]
+
+    def attempt_keys(self, sub, job_id):
+        prefix = f"clips/{sub}/{job_id}.attempt-"
+        return [obj["Key"]
+                for page in self.s3.get_paginator("list_objects_v2").paginate(Bucket=self.bucket, Prefix=prefix)
+                for obj in page.get("Contents", [])]
 
     def read_json(self, key):
         """The JSON object stored at key, or None when it is missing or not readable."""

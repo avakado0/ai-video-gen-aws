@@ -77,6 +77,20 @@ class JobService:
             view["reason"] = reason or {"code": "internal", "message": "The job failed."}
         return view
 
+    def _cost(self, sub, job_id):
+        """What the job's attempts cost and how many tries it took, from the worker's usage records.
+
+        `attempts` is the highest attempt number seen (an attempt killed with no warning leaves no
+        record but still counted). `cost_usd` is the sum, or None as soon as one price is unknown or
+        one record is unreadable: a partial sum would pass for the real cost."""
+        records = self.store.list_attempts(sub, job_id)
+        if not records:
+            return {"cost_usd": None, "attempts": None}
+        costs = [r.get("cost_usd") for _, r in records]
+        known = all(isinstance(c, (int, float)) and not isinstance(c, bool) for c in costs)
+        return {"cost_usd": round(sum(costs), 4) if known else None,
+                "attempts": max(len(records), records[-1][0])}
+
     def list_jobs(self, sub):
         """The caller's jobs, newest first. Found by listing `clips/{sub}/`: there is no database."""
         jobs = []
@@ -93,6 +107,8 @@ class JobService:
             head = self.store.head(key)
             if head is not None:
                 view = self._view(sub, job_id, status, head["LastModified"])
+                if status != "pending":
+                    view.update(self._cost(sub, job_id))
                 if status == "ready":
                     view["url"] = self.store.presigned_get(key)
                 return view
@@ -109,7 +125,7 @@ class JobService:
                 found[key] = (ext, head)
         if not found:
             raise rules.RequestError(404, "Job not found")
-        self.store.delete(list(found))
+        self.store.delete(list(found) + self.store.attempt_keys(sub, job_id))
         for ext, head in found.values():
             if ext == "mp4":
                 log_usage("download", sub=sub, job_id=job_id, bytes=head["ContentLength"])
